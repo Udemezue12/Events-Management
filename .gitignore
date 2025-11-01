@@ -1,0 +1,5 @@
+/ticket-env/
+/ticketing_app/__pycache__/
+/ticketing_app/.env
+/mypy_cache/
+/ticketing_app/supabase
