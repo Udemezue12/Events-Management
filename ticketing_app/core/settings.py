@@ -23,13 +23,12 @@ class Settings(BaseSettings):
         os.path.dirname(__file__), "..", "supabase", "supabase-ca.crt"
     )
 
-    # ✅ Sync Engine (PgBouncer) — use with Django/admin tasks
+  
     DATABASE_URL: str = (
         f"postgresql+psycopg3://postgres:{SUPABASE_PASSWORD}"
         f"@{SUPABASE_DIRECT_HOST}:{SUPABASE_DIRECT_PORT}/{SUPABASE_DB}"
     )
 
-    # ✅ Async Engine (Asyncpg) — used for FastAPI + Alembic
     ASYNC_DATABASE_URL: str = (
         f"postgresql+asyncpg://postgres:{SUPABASE_PASSWORD}"
         f"@{SUPABASE_DIRECT_HOST}:{SUPABASE_DIRECT_PORT}/{SUPABASE_DB}"

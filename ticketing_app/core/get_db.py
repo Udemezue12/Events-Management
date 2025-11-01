@@ -3,11 +3,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from .settings import settings
+from ticketing_app.core.settings import settings
 
-# ---------------------------------------------
-# ✅ SYNC ENGINE (for Alembic / Django / Scripts)
-# ---------------------------------------------
+
 SyncEngine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=SyncEngine)
 
@@ -20,9 +18,7 @@ def get_db():
         db.close()
 
 
-# ---------------------------------------------
-# ✅ ASYNC ENGINE (for FastAPI / AsyncORM)
-# ---------------------------------------------
+
 ssl_context = ssl.create_default_context(cafile=settings.SUPABASE_CA_PATH)
 ssl_context.check_hostname = True
 ssl_context.verify_mode = ssl.CERT_REQUIRED
