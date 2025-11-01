@@ -23,7 +23,7 @@ class Event(Base):
     total_tickets = Column(Integer, nullable=False)
     tickets_sold = Column(Integer, default=0)
     venue_address = Column(String)
-  
+
     venue_location = Column(Geography(geometry_type="POINT", srid=4326))
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())

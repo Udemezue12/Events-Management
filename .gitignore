@@ -2,13 +2,4 @@
 /ticketing_app/__pycache__/
 /ticketing_app/.env
 /mypy_cache/
-/ticketing_app/supabase
-/ticketing_app/core/__pycache__
-/ticketing_app/models/__pycache__
-/ticketing_app/repositories/__pycache__
-/ticketing_app/schemas/__pycache__
-/ticketing_app/services/__pycache__
-/ticketing_app/tests/__pycache__
-/ticketing_app/utils/__pycache__
-/ticketing_app/worker/__pycache__
-/ticketing_app/routes/__pycache__
+/ticketing_app/
