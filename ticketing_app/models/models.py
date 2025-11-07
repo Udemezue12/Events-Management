@@ -1,6 +1,6 @@
 from core.get_db import Base
 from geoalchemy2 import Geography
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func, Boolean
 
 
 class User(Base):
@@ -10,6 +10,8 @@ class User(Base):
     name = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    is_active= Column(Boolean, default=True)
+    is_verified= Column(Boolean, default=False)
 
 
 class Event(Base):
@@ -27,6 +29,7 @@ class Event(Base):
     venue_location = Column(Geography(geometry_type="POINT", srid=4326))
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
 
 
 class Ticket(Base):

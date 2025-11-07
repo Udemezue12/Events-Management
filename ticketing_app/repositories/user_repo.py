@@ -4,16 +4,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class UserRepo:
-    async def get_user_email(self, db: AsyncSession, email: str):
-        user_email = select(User).where(User.email == email)
-        return await db.scalar(user_email)
+    def __init__(self, db:AsyncSession):
+        self.db = db
 
-    async def get_name(self, db: AsyncSession, name: str):
-        names = select(User).where(User.name == name)
-        return await db.scalar(names)
+    async def get_name(self, name: str) -> User | None:
+        result = self.db.execute(select(User).where(User.name == name))
+        return result.scalar_one_or_none()
 
-    async def create(self, db: AsyncSession, user: User):
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-        return user
+    async def get_by_email(self, email: str) -> User | None:
+        result = await self.db.execute(select(User).where(User.email == email))
+        return result.scalar_one_or_none()
+
+    async def create(self, user: User):
+        self.db.add(user)
+        try:
+            await self.db.commit()
+            await self.db.refresh(user)
+            return user
+        except:
+            await self.db.rollback()
+            raise

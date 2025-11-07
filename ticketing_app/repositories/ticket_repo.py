@@ -13,9 +13,13 @@ class TicketRepo:
     async def create_ticket(self, user_id: int, event_id: int) -> Ticket:
         ticket = Ticket(user_id=user_id, event_id=event_id, status="reserved")
         self.db.add(ticket)
-        await self.db.commit()
-        await self.db.refresh(ticket)
-        return ticket
+        try:
+            await self.db.commit()
+            await self.db.refresh(ticket)
+            return ticket
+        except:
+            await self.db.rollback()
+            raise
 
     async def increment_tickets_sold(self, event: Event):
         event.tickets_sold += 1
@@ -43,3 +47,5 @@ class TicketRepo:
         """)
         result = await self.db.execute(query, {"user_id": user_id})
         return [dict(row) for row in result.mappings().all()]
+    async def get_ticket_by_id(self, ticket_id: int) -> Ticket | None:
+        return await self.db.scalar(select(Ticket).where(Ticket.id == ticket_id))

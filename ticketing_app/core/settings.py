@@ -42,6 +42,7 @@ class Settings(BaseSettings):
         f"redis://{os.getenv('CELERY_REDIS_USERNAME')}:{os.getenv('CELERY_REDIS_PASSWORD')}"
         f"@{os.getenv('CELERY_REDIS_HOST')}:{os.getenv('CELERY_REDIS_PORT')}/0"
     )
+    VERIFY_EMAIL_SALT:str | None = os.getenv("VERIFY_EMAIL_SALT")
     RABBITMQ_MAIN_EXCHANGE: str = "ticketing_main_exchange"
     RABBITMQ_URL: str = os.getenv("RABBITMQ_URL", "")
     RABBITMQ_DLX: str = "dead_letter_exchange"
@@ -49,6 +50,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = os.getenv(
         "REDIS_URL", "rediss://:123456789@gusc1-related-narwhal-32244.upstash.io:6379"
     )
+    VERIFY_EMAIL_SECRET_KEY: str | None = os.getenv("EMAIL_SECRET_KEY")
     RATE_LIMIT: str = "20/minute"
     UPTASH_REDIS_TOKEN: str | None = os.getenv("UPSTASH_REDIS_REST_TOKEN")
     UPTASH_REDIS_URL: str | None = os.getenv("UPSTASH_REDIS_REST_URL")
@@ -58,6 +60,11 @@ class Settings(BaseSettings):
         extra = "ignore"
 
         env_file_encoding = "utf-8"
+    EMAIL_USER: str | None = os.getenv("EMAIL_USER")
+    EMAIL_PASSWORD: str | None = os.getenv("EMAIL_PASSWORD")
+    EMAIL_SERVER: str | None = os.getenv("EMAIL_SERVER")
+    EMAIL_PORT: int = 587
+    EMAIL_USE_TLS: bool = True
 
 
 settings = Settings()

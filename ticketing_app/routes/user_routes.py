@@ -17,16 +17,13 @@ router = APIRouter(tags=["Users"])
 
 @cbv(router)
 class UserRoutes:
-    def __init__(self):
-        self.service = UserService(UserRepo())
-
     @router.post("/users/create", response_model=UserOut, dependencies=[rate_limit])
     @safe_handler
     async def create_user(
         self, data: UserCreate, db: AsyncSession = Depends(get_db_async)
     ):
         async def handler():
-            user = await self.service.create_user(db, data)
+            user = await UserService(db).create_user(data)
             return user
 
         return await breaker.call(handler)

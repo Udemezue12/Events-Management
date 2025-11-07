@@ -25,37 +25,37 @@ class TicketsRoutes:
         self, data: TicketCreate, db: AsyncSession = Depends(get_db_async)
     ):
         async def handler():
-            repo = TicketRepo(db)
-            service = TicketService(repo)
-            ticket = await service.reserve_ticket(
+            ticket = await TicketService(db).reserve_ticket(
                 user_id=data.user_id, event_id=data.event_id
             )
             return ticket
 
         return await breaker.call(handler)
+
     @router.post("/{ticket_id}/pay", dependencies=[rate_limit])
     @safe_handler
-    async def pay_ticket(self, ticket_id:int, db:AsyncSession=Depends(get_db_async)):
+    async def pay_ticket(
+        self, ticket_id: int, db: AsyncSession = Depends(get_db_async)
+    ):
         async def handler():
-            repo = TicketRepo(db)
-            service = TicketService(repo)
-            result = await service.mark_as_paid(ticket_id)
-            return {
-                "message": "Ticket Paid successfully",
-                **result
-            }
+            result = await TicketService(db).mark_as_paid(ticket_id)
+            return {"message": "Ticket Paid successfully", **result}
+
         return await breaker.call(handler)
-    @router.get("/users/{user_id}/history/tickets", dependencies=[rate_limit],response_model=List[TicketHistoryResponse])
+
+    @router.get(
+        "/users/{user_id}/history/tickets",
+        dependencies=[rate_limit],
+        response_model=List[TicketHistoryResponse],
+    )
     @safe_handler
-    async def get_user_tickets(self, user_id:int, db:AsyncSession=Depends(get_db_async)):
+    async def get_user_tickets(
+        self, user_id: int, db: AsyncSession = Depends(get_db_async)
+    ):
         async def handler():
-            repo = TicketRepo(db)
-            service = TicketService(repo)
-            tickets = await service.get_user_ticket_history(user_id)
+            tickets = await TicketService(db).get_user_ticket_history(user_id)
             if not tickets:
                 raise HTTPException(status_code=404, detail="No ticket history found")
             return tickets
-        return await breaker.call(handler)
 
-            
-        
+        return await breaker.call(handler)

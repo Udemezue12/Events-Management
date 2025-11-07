@@ -11,11 +11,11 @@ from schemas.schema import EventOut
 
 
 class EventService:
-    def __init__(self, repository: EventRepo):
-        self.repository = repository
+    def __init__(self, db):
+        self.repository:EventRepo = EventRepo(db)
 
-    async def create_event(self, db, payload):
-        await self.repository.create(db, payload)
+    async def create_event(self, payload):
+        await self.repository.create(payload)
 
         asyncio_task(cache.set_json("events:list:stale", {"stale": True}))
 
@@ -50,22 +50,22 @@ class EventService:
             venue_lon=payload.venue_lon,
         )
 
-    async def list_events(self, db):
+    async def list_events(self):
         cache_key = "events:list"
         cached = await cache.get_json(cache_key)
         if cached:
             return cached
 
-        events = await self.repository.get_all(db)
+        events = await self.repository.get_all()
         await cache.set_json(cache_key, [e.as_dict() for e in events], ttl=120)
         return events
 
-    async def nearby_events(self, db, lat: float, lon: float):
+    async def nearby_events(self, lat: float, lon: float):
         cache_key = f"for-you:{lat}:{lon}"
         cached = await cache.get_json(cache_key)
         if cached:
             return cached
 
-        events = await self.repository.get_nearby(db, lat, lon)
+        events = await self.repository.get_nearby(lat, lon)
         await cache.set_json(cache_key, [e.as_dict() for e in events], ttl=180)
         return events

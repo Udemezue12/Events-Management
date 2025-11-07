@@ -11,11 +11,11 @@ from worker.celery_tasks import expire_old_tickets
 
 
 class TicketService:
-    def __init__(self, repo: TicketRepo):
-        self.repo = repo
+    def __init__(self, db):
+        self.repo:TicketRepo = TicketRepo(db)
 
     async def reserve_ticket(self, user_id: int, event_id: int):
-        db = self.repo.db
+       
         try:
             event = await self.repo.get_event_by_id(event_id)
             if not event:
@@ -49,19 +49,19 @@ class TicketService:
 
             return ticket
         except Exception as e:
-            await db.rollback()
+            
             print(f"Error reserving ticket: {e}")
             raise e
 
     async def mark_as_paid(self, ticket_id: int):
-        db = self.repo.db
+      
         ticket = await self.repo.get_ticket_by_id(ticket_id)
         if not ticket:
             raise ValueError("Ticket not found")
         if ticket.status == "paid":
             raise ValueError("Ticket already paid for")
 
-        await self.repo.mark_ticket_paid(ticket_id)
+        await self.repo.mark_ticket_as_paid(ticket_id)
 
         await run_in_thread(
             asyncio_run,

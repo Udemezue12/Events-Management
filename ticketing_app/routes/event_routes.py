@@ -1,4 +1,3 @@
-
 import logging
 
 from core.breaker import breaker
@@ -18,16 +17,13 @@ router = APIRouter(tags=["Events"])
 
 @cbv(router)
 class EventRoutes:
-    def __init__(self):
-        self.service = EventService(EventRepo())
-
     @router.post("/events/create", response_model=EventOut, dependencies=[rate_limit])
     @safe_handler
     async def create_event(
         self, data: EventCreate, db: AsyncSession = Depends(get_db_async)
     ):
         async def handler():
-            return await self.service.create_event(db, data)
+            return await EventService(db).create_event(data)
 
         return await breaker.call(handler)
 
@@ -35,7 +31,7 @@ class EventRoutes:
     @safe_handler
     async def list_events(self, db: AsyncSession = Depends(get_db_async)):
         async def handler():
-            return await self.service.list_events(db)
+            return await EventService(db).list_events()
 
         return await breaker.call(handler)
 
@@ -45,6 +41,6 @@ class EventRoutes:
         self, lat: float, lon: float, db: AsyncSession = Depends(get_db_async)
     ):
         async def handler():
-            return await self.service.nearby_events(db, lat, lon)
+            return await EventService(db).nearby_events(lat, lon)
 
         return await breaker.call(handler)
