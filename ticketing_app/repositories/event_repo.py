@@ -1,10 +1,10 @@
 from models.models import Event
 from sqlalchemy import func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
+
 
 
 class EventRepo:
-    def __init__(self, db:AsyncSession):
+    def __init__(self, db):
         self.db = db
 
     async def create(self, payload):

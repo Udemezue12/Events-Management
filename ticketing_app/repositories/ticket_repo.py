@@ -1,10 +1,10 @@
 from models.models import Event, Ticket
 from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession
+
 
 
 class TicketRepo:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db):
         self.db = db
 
     async def get_event_by_id(self, event_id: int) -> Event:

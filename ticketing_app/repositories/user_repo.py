@@ -1,10 +1,10 @@
 from models.models import User
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+
 
 
 class UserRepo:
-    def __init__(self, db:AsyncSession):
+    def __init__(self, db):
         self.db = db
 
     async def get_name(self, name: str) -> User | None:

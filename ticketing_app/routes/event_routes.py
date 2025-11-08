@@ -6,7 +6,6 @@ from core.safe_handler import safe_handler
 from core.throttling import rate_limit
 from fastapi import APIRouter, Depends
 from fastapi_utils.cbv import cbv
-from repositories.event_repo import EventRepo
 from schemas.schema import EventCreate, EventOut
 from services.event_service import EventService
 from sqlalchemy.ext.asyncio import AsyncSession
