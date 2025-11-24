@@ -1,6 +1,6 @@
-
 import os
 import platform
+
 
 def setup_gdal():
     system = platform.system()

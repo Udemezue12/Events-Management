@@ -1,44 +1,281 @@
+import re
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from typing import Literal, Optional
+
+import phonenumbers
+from models.enums import Role
+from models.models import Event
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+
 
 class UserBase(BaseModel):
-    name: str
     email: EmailStr
-    password:str
+    username: str
+    role: Role
+
 
 class UserCreate(UserBase):
-    pass
+    firstName: str = Field(..., min_length=5)
+    lastName: str = Field(..., min_length=5)
+    name: str | None = Field(default=None, exclude=True)
+    username: str = Field(..., min_length=5, max_length=20)
+    password: str = Field(
+        ..., min_length=7, json_schema_extra={"type": "string", "format": "password"}
+    )
+    phone_number: str
+    # model_config = {"json_schema_extra": {"exclude": ["name"]}}
 
-class UserOut(BaseModel):
-    id: int
-    name:str
-    email:EmailStr
+    @field_validator("phone_number")
+    def validate_phone(cls, value: str):
+        try:
+            parsed = phonenumbers.parse(value, None)
+            if not phonenumbers.is_valid_number(parsed):
+                raise ValueError("Invalid phone number. Use full international format.")
+            return phonenumbers.format_number(
+                parsed, phonenumbers.PhoneNumberFormat.E164
+            )
+        except Exception:
+            raise ValueError("Invalid phone number format. Use e.g. +2348012345678")
 
-    class Config:
-        orm_mode = True
+    @field_validator("password")
+    def validate_password(cls, v: str):
+        errors = []
+        if len(v) < 7:
+            errors.append("≥7 characters")
+        if not re.search(r"[A-Z]", v):
+            errors.append("uppercase letter")
+        if not re.search(r"[a-z]", v):
+            errors.append("lowercase letter")
+        if not re.search(r"\d", v):
+            errors.append("number")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            errors.append("special character")
+        if errors:
+            raise ValueError("Password must contain: " + ", ".join(errors))
+        return v
+
+    @model_validator(mode="after")
+    def finalize_fields(self):
+        if not self.username:
+            object.__setattr__(self, "username", self.email.split("@")[0])
+        object.__setattr__(self, "name", f"{self.firstName} {self.lastName}".strip())
+        return self
+
+
+class UserLoginInput(BaseModel):
+    email: EmailStr
+    password: str = Field(
+        ..., min_length=7, json_schema_extra={"type": "string", "format": "password"}
+    )
+
+
+class ForgotPasswordSchema(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordSchema(BaseModel):
+    token: Optional[str] = None
+    otp: Optional[str] = None
+    new_password: str
+
+    @model_validator(mode="before")
+    def validate_token_or_otp(cls, values):
+        token = values.get("token")
+        otp = values.get("otp")
+        if not token and not otp:
+            raise ValueError("Either token or otp must be provided")
+        return values
 
 
 class EventCreate(BaseModel):
     title: str
-    description: str | None = None
+    description: Optional[str] = None
     start_time: datetime
     end_time: datetime
     total_tickets: int
-    venue_address: str
-    venue_lat: float = Field(..., description="Latitude of event venue")
-    venue_lon: float = Field(..., description="Longitude of event venue")
+    venue_id: int
 
-class EventOut(EventCreate):
+    ticket_price: Optional[float] = 0.0
+
+
+class EventOut(BaseModel):
     id: int
-    tickets_sold: int
+    title: str
+    description: Optional[str]
+    start_time: datetime
+    end_time: datetime
+    venue_id: Optional[int]
+    created_by: Optional[int]
 
-    class Config:
-        orm_mode = True
-class TicketCreate(BaseModel):
-    user_id: int
-    event_id: int
+    @classmethod
+    def from_orm(cls, event: Event):
+        return cls(
+            id=event.id,
+            title=event.title,
+            description=event.description,
+            start_time=event.start_time,
+            end_time=event.end_time,
+            venue_id=event.venue_id,
+            created_by=event.created_by,
+        )
+
 
 class TicketOut(BaseModel):
+    id: int
+    user_name: str
+    user_email: str
+    event_name: str
+    venue_name: str
+    status: str
+    type: str
+    price_paid: float
+    quantity: int
+
+    class Config:
+        form_attributes = True
+
+
+class TicketCreate(BaseModel):
+    event_id: int
+    quantity: int = 1
+    # payment_method: Literal["paystack", "flutterwave"]
+
+
+class MarkTicket(BaseModel):
+    ticket_id: int
+
+
+class GetSingleUserTicket(BaseModel):
+    user_id: int
+
+
+class GetAllUsersTickets(BaseModel):
+    event_id: int
+    organizer_id: int
+
+
+class GetOrganizerTickets(BaseModel):
+    organizer_id: int
+
+
+class UsersPaymentOut(BaseModel):
+    user_name: Optional[str]
+    status: Optional[str]
+    ticket_quantity: int
+    event_name: Optional[str]
+    event_creator: Optional[str]
+    venue: Optional[str]
+    amount: float
+    payment_method: Literal["paystack", "flutterwave"]
+    created_at: str
+    reference: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class OrganizerPaymentOut(BaseModel):
+    ticket_id: int
+    event_id: int
+    user_name: Optional[str]
+    ticket_quantity: int
+    event_name: Optional[str]
+    event_creator: Optional[str]
+    venue: Optional[str]
+    amount: float
+    status: Optional[str]
+    payment_method: Literal["paystack", "flutterwave"]
+    reference: Optional[str]
+    created_at: datetime
+
+    class Config:
+        form_attributes = True
+
+
+class PaymentRefundOut(BaseModel):
+    payment_id: int
+    status: Literal["refunded"]
+
+
+class PaymentRefund(BaseModel):
+    payment_id: int
+
+
+class PaymentInit(BaseModel):
+    ticket_id: int
+
+    method: Literal["paystack", "flutterwave"]
+
+
+class PaymentVerifyOut(BaseModel):
+    payment_id: int
+    status: Literal["completed", "failed", "pending"]
+
+
+class PaymentVerify(BaseModel):
+    reference: str
+
+
+class PaymentInitOut(BaseModel):
+    payment_id: int
+    authorization_url: str
+    reference: str
+
+
+class ReviewCreate(BaseModel):
+    event_id: int
+    rating: int
+    comment: Optional[str] = None
+
+
+class ReviewOut(BaseModel):
+    id: int
+    event_id: int
+    user_id: int
+    event_name: str
+    user_name: str
+    rating: int
+    comment: Optional[str]
+    created_at: datetime
+
+    class Config:
+        form_attributes = True
+
+
+class VenueCreate(BaseModel):
+    name: str
+    address: str
+    capacity: int
+    # location: Optional[str] = None
+
+
+class VenueOut(BaseModel):
+    id: int
+    name: str
+    address: str
+    capacity: int
+    location: Optional[dict]
+
+    class Config:
+        form_attributes = True
+
+
+class PaymentOutS(BaseModel):
+    id: int
+    user_id: int
+    ticket_id: int
+    event_id: int
+    amount: float
+    payment_method: str
+    status: str
+    reference: Optional[str]
+    created_at: datetime
+
+    class Config:
+        form_attributes = True
+
+
+class TicketOutS(BaseModel):
     id: int
     user_id: int
     event_id: int
@@ -46,13 +283,4 @@ class TicketOut(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
-class TicketHistoryResponse(BaseModel):
-    id: int
-    status: str
-    reserved_at: datetime
-    event_title: str
-    location: str
-
-    class Config:
-        orm_mode = True
+        form_attributes = True

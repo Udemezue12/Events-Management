@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
-from worker.celery_tasks import expire_old_tickets
+from ticketing_app.tasks.celery_tasks import expire_old_tickets
 from models.models import Ticket
 
 pytestmark = pytest.mark.asyncio

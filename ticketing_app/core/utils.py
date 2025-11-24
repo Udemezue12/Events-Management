@@ -1,9 +1,6 @@
-
-from .rabbitmq import rabbitmq
 from core.settings import settings
 
-
-
+from .rabbitmq import rabbitmq
 
 
 async def publish_event(event_name: str, data: dict):

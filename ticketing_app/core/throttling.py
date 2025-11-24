@@ -1,10 +1,10 @@
 
 import redis.asyncio as aioredis
+from core.settings import settings
 from fastapi import Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
-from core.settings import settings
 
 
 class RateLimitManager:

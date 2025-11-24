@@ -1,44 +1,52 @@
 from core.setup_gdal import setup_gdal
 
-setup_gdal()
+# setup_gdal() #Only use it in development
 
-
+import asyncio
+import os
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import uvicorn
 from core.cache import cache
+from core.csrf_middleware import AutoRefreshAccessTokenMiddleware
+from core.get_csfToken import csrf_router
+from core.get_db import AsyncSessionLocal
+from core.ping import pinger
 from core.rabbitmq import rabbitmq
 from core.settings import settings
 from core.throttling import rate_limiter_manager
 from dotenv import load_dotenv
 from fastapi import FastAPI
-
-from fastapi.responses import FileResponse
-from passlib.context import CryptContext
+from fastapi.responses import HTMLResponse
+from repositories.user_repo import UserRepo
 from routes.event_routes import router as event_router
+from routes.payment_routes import router as payment_router
+from routes.review_routes import router as review_router
 from routes.ticket_routes import router as ticket_router
 from routes.user_routes import router as user_router
+from routes.venue_routes import router as venue_router
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.sessions import SessionMiddleware
+from utils.sms_service import send_sms
 
 load_dotenv()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     exception_handlers={429: rate_limiter_manager.limit_exceeded_handler},
-    description=f"This is the backend for the {settings.PROJECT_NAME} built with FastAPI.",
-    version="1.0.0",
-   
+    version="2.0.0",
 )
 BASE_DIR = Path(__file__).resolve().parent
 
 
-
+app.include_router(csrf_router)
+app.include_router(user_router)
 app.include_router(ticket_router)
 app.include_router(event_router)
-app.include_router(user_router)
-
-
-
+app.include_router(venue_router)
+app.include_router(payment_router)
+app.include_router(review_router)
 
 
 @app.get("/health", tags=["System"])
@@ -49,6 +57,8 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     print("INFO:Waiting for application startup.")
+    await send_sms.connect()
+    await send_sms.ping()
 
     try:
         print(" Connecting to RabbitMQ...")
@@ -57,6 +67,14 @@ async def startup_event():
         print("Connected to RabbitMQ.")
     except Exception as e:
         print(f"RabbitMQ connection failed: {e}")
+    try:
+        async with AsyncSessionLocal() as db:
+            cutoff = datetime.utcnow() - timedelta(days=7)
+            auth_service = UserRepo(db)
+            await auth_service.delete_expired_blacklisted_tokens(cutoff)
+            print("Blacklisted tokens cleanup completed.")
+    except Exception as e:
+        print(f"Unexpected error cleaning blacklisted tokens: {e}")
 
     try:
         print("Connecting to Upstash Redis...")
@@ -70,7 +88,17 @@ async def startup_event():
         print("Rate limiter (Redis Cloud) connected.")
     except Exception as e:
         print(f"Rate limiter connection failed: {e}")
-    
+    try:
+        if os.getenv("RUN_LOCAL_PINGER", "false").lower() == "true":
+            urls = settings.CRITICAL_SERVICE_URLS
+            if urls and any(url.strip() for url in urls):
+                print("Starting lightweight periodic pinger...")
+                asyncio.create_task(pinger.lightweight_periodic_ping())
+                print("Lightweight periodic pinger started.")
+            else:
+                print("Skipping pinger startup: No critical service URLs configured.")
+    except Exception as e:
+        print(f"Error occurred while starting lightweight periodic pinger: {e}")
 
     print("Application startup complete.")
 
@@ -81,23 +109,21 @@ async def shutdown_event():
         await rabbitmq.connection.close()
 
 
-@app.get("/")
-async def read_index():
-    try:
-        index_path = BASE_DIR.parent / "frontend" / "build" / "index.html"
-
-        if not index_path.exists():
-            return {"detail": "index.html not found."}
-
-        return FileResponse(index_path)
-
-    except Exception as e:
-        return {"detail": f"Error serving index.html: {str(e)}"}
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    with open("templates/index.html", "r", encoding="utf-8") as f:
+        return f.read()
 
 
 
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
-
+app.add_middleware(
+    AutoRefreshAccessTokenMiddleware,
+    secret_key=settings.SECRET_KEY,
+    algorithm=settings.ALGORITHM,
+    access_exp_minutes=settings.ACCESS_EXPIRE_MINUTES,
+    secure_cookies=settings.SECURE_COOKIES,
+)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8001, reload=True)

@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 class Cache:
     def __init__(self):
-        self.redis_url = settings.UPTASH_REDIS_URL.rstrip("/")
-        self.redis_token = settings.UPTASH_REDIS_TOKEN
+        self.redis_url = settings.UPSTASH_REDIS_URL.rstrip("/")
+        self.redis_token = settings.UPSTASH_REDIS_TOKEN
 
         if not self.redis_url or not self.redis_token:
             raise ValueError("Missing Upstash Redis environment variables")
@@ -26,26 +26,35 @@ class Cache:
             "Content-Type": "application/json",
         }
 
-    @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=10))
+    @retry(
+        stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=10)
+    )
     async def connect(self):
-        async with httpx.AsyncClient() as client:
-            try:
-                logger.info("Connecting to Upstash Redis...")
-                res = await client.get(f"{self.redis_url}/ping", headers=self.headers)
-                if res.status_code == 200 and res.json().get("result") == "PONG":
-                    logger.info("Connected to Upstash Redis.")
-                else:
-                    raise ConnectionError("Upstash Redis ping failed.")
-            except Exception as e:
-                logger.error("Redis connection error:", exc_info=e)
-                raise
+        async def handler():
+            async with httpx.AsyncClient() as client:
+                try:
+                    logger.info("Connecting to Upstash Redis...")
+                    res = await client.get(
+                        f"{self.redis_url}/ping", headers=self.headers
+                    )
+                    if res.status_code == 200 and res.json().get("result") == "PONG":
+                        logger.info("Connected to Upstash Redis.")
+                    else:
+                        raise ConnectionError("Upstash Redis ping failed.")
+                except Exception as e:
+                    logger.error("Redis connection error:", exc_info=e)
+                    raise
+
+        await breaker.call(handler)
 
     async def get(self, key: str) -> Optional[str]:
         async def handler():
             try:
                 encoded_key = urllib.parse.quote(str(key))
                 async with httpx.AsyncClient() as client:
-                    res = await client.get(f"{self.redis_url}/get/{encoded_key}", headers=self.headers)
+                    res = await client.get(
+                        f"{self.redis_url}/get/{encoded_key}", headers=self.headers
+                    )
                     if res.status_code == 200:
                         return res.json().get("result")
                     if res.status_code == 404:
@@ -61,9 +70,7 @@ class Cache:
 
         return await breaker.call(handler)
 
-   
     async def set(self, key: str, value: str, ttl: int = 3600) -> None:
-        """Safely store data in Upstash Redis using POST body (not URL)."""
         if key is None or value is None:
             raise ValueError("Cache key and value cannot be None")
 
@@ -72,7 +79,7 @@ class Cache:
                 encoded_key = urllib.parse.quote(str(key))
                 async with httpx.AsyncClient() as client:
                     url = f"{self.redis_url}/set/{encoded_key}?ex={ttl}"
-                    
+
                     res = await client.post(url, headers=self.headers, content=value)
                     if res.status_code == 200:
                         logger.debug("Cache set successfully for key: %s", key)
@@ -84,6 +91,23 @@ class Cache:
                 logger.error("Connection error during Redis SET:", exc_info=e)
             except Exception as e:
                 logger.error("Unexpected error during Redis SET:", exc_info=e)
+
+        return await breaker.call(handler)
+
+    async def delete(self, key: str) -> bool:
+        async def handler():
+            try:
+                encoded_key = urllib.parse.quote(str(key))
+                async with httpx.AsyncClient() as client:
+                    res = await client.delete(
+                        f"{self.redis_url}/del/{encoded_key}", headers=self.headers
+                    )
+                    if res.status_code == 200:
+                        return True
+                    return False
+            except Exception as e:
+                logger.error("Redis DELETE error:", exc_info=e)
+                return False
 
         return await breaker.call(handler)
 
@@ -103,7 +127,6 @@ class Cache:
         await self.set(key, data, ttl)
 
     def set_json_sync(self, key: str, value: Any):
-   
         loop = asyncio.get_event_loop()
         if loop.is_running():
             asyncio.create_task(self.set_json(key, value))

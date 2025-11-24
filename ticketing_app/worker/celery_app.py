@@ -1,5 +1,4 @@
 from celery import Celery
-from celery.schedules import crontab
 from core.settings import settings
 
 
@@ -7,11 +6,13 @@ class CeleryManager:
     def __init__(self):
         self.REDIS_URL = settings.CELERY_REDIS_URL
 
+       
+
         self.app = Celery(
             "ticket_tasks",
             broker=self.REDIS_URL,
             backend=self.REDIS_URL,
-            include=["core.celery_tasks"],
+            include=["tasks.celery_tasks"],   
         )
 
         self.app.conf.update(
@@ -24,11 +25,28 @@ class CeleryManager:
             broker_connection_retry_on_startup=True,
         )
 
+        self._register_periodic_tasks()
+
+    def _register_periodic_tasks(self):
+        @self.app.on_after_configure.connect
+        def setup_periodic_tasks(sender, **kwargs):
+            try:
+               
+                from tasks.celery_tasks import CeleryTasks
+                tasks = CeleryTasks()
+
+                sender.add_periodic_task(
+                    60.0,
+                    tasks.expire_reserved_tickets.s(),
+                    name="expire reserved tickets every 1 minute",
+                )
+
+                print("Periodic task registered successfully.")
+            except Exception as e:
+                print(f"Error setting up periodic tasks: {e}")
+
     def task(self, *args, **kwargs):
-        try:
-            return self.app.task(*args, **kwargs)
-        except Exception as e:
-            print(f"Error occurred while registering task: {e}")
+        return self.app.task(*args, **kwargs)
 
     async def connect(self):
         print(f"Connecting to Celery broker: {self.REDIS_URL}")
@@ -39,17 +57,11 @@ class CeleryManager:
             else:
                 print("Celery connected but no workers found.")
         except Exception as e:
-            print("Celery connection failed:", exc_info=e)
+            print("Celery connection failed:", e)
 
     def delay(self, func_name: str, *args, **kwargs):
-        try:
-            return self.app.send_task(func_name, args=args, kwargs=kwargs)
-        except Exception as e:
-            print(f"Error occurred while delaying task {func_name}: {e}")
+        return self.app.send_task(func_name, args=args, kwargs=kwargs)
 
 
 celery_app = CeleryManager()
 app = celery_app.app
-
-
-from core import celery_tasks

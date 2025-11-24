@@ -71,7 +71,7 @@ alembic upgrade head
 
 Start the FastAPI development server:
 
-uvicorn main:app --reload
+uvicorn app:app --reload
 
 
 Start Celery worker for background tasks:
