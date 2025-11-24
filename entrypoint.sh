@@ -1,7 +1,8 @@
-
+#!/bin/sh
 set -e
 
 echo "Applying database migrations using Alembic..."
+cd /app/ticketing_app
 alembic upgrade head
 echo "Database migrations completed."
 

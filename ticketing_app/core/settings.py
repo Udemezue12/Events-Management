@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     VERIFY_EMAIL_SECRET_KEY: str | None = os.getenv("VERIFY_EMAIL_SECRET_KEY")
     RESET_PASSWORD_SALT: str = "password-reset-salt"
     VERIFY_EMAIL_SALT: str = "verify-reset-salt"
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL")
     JWT_SECRET_KEY: str | None = os.getenv("JWT_SECRET_KEY")
     ALGORITHM: str | None = os.getenv("ALGORITHM")
     OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     ACCESS_EXPIRE_MINUTES: int = 10
     REFRESH_EXPIRE_DAYS: int = 5
     CSRF_TOKEN_EXPIRE_DAYS: int = 5
-    SECURE_COOKIES: bool = False  # must be false on localhost
+    SECURE_COOKIES: bool = True  # must be false on localhost
     SECRET_KEY: str | None = os.getenv("SECRET_KEY")
     jwt_expiration: ClassVar[datetime] = datetime.utcnow() + timedelta(hours=1)
     access_key_jwt_expiration: ClassVar[datetime] = datetime.utcnow() + timedelta(
