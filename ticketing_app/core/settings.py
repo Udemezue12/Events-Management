@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     VERIFY_EMAIL_SECRET_KEY: str | None = os.getenv("VERIFY_EMAIL_SECRET_KEY")
     RESET_PASSWORD_SALT: str = "password-reset-salt"
     VERIFY_EMAIL_SALT: str = "verify-reset-salt"
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL")
+    FRONTEND_URL: str | None = os.getenv("FRONTEND_URL")
     JWT_SECRET_KEY: str | None = os.getenv("JWT_SECRET_KEY")
     ALGORITHM: str | None = os.getenv("ALGORITHM")
     OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
