@@ -5,12 +5,12 @@ from core.breaker import breaker
 from core.get_current_user import get_current_user
 from core.get_db import get_db_async
 from core.safe_handler import safe_handler
+from core.validators import validate_csrf_dependency
 from core.throttling import rate_limit
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi_utils.cbv import cbv
 from models.models import User
 from schemas.schema import (
-    GetAllUsersTickets,
     TicketCreate,
     TicketOut,
 )
@@ -30,6 +30,8 @@ class TicketsRoutes:
         data: TicketCreate,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency)
+        
     ):
         async def handler():
             ticket = await TicketService(db).reserve_ticket(
@@ -47,6 +49,7 @@ class TicketsRoutes:
         self,
         ticket_id: int,
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency)
     ):
         async def handler():
             result = await TicketService(db).mark_as_paid(ticket_id=ticket_id)
@@ -66,6 +69,7 @@ class TicketsRoutes:
         per_page: int = 20,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency)
     ):
         async def handler():
             tickets = await TicketService(db).get_user_ticket(
@@ -89,6 +93,7 @@ class TicketsRoutes:
         per_page: int = 20,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency)
     ):
         async def handler():
             if current_user.role.name != "admin":
@@ -115,6 +120,7 @@ class TicketsRoutes:
         per_page: int = 20,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency)
     ):
         async def handler():
             if current_user.role.name not in ["admin", "organizer"]:

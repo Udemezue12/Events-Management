@@ -26,8 +26,9 @@ class UserRoutes:
         data: UserCreate,
         background_tasks: BackgroundTasks,
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency),
     ):
-        # return await UserService(db).register(data)
+        
         return await UserService(db).register(data, background_tasks)
 
     @router.post("/login", dependencies=[rate_limit])
@@ -46,6 +47,7 @@ class UserRoutes:
         self,
         request: Request,
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency),
     ):
         return await UserService(db).logout(request)
 
@@ -58,6 +60,7 @@ class UserRoutes:
         self,
         request: Request,
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency),
     ):
         return await UserService(db).refresh(request)
 
@@ -68,6 +71,7 @@ class UserRoutes:
         otp: str | None = None,
         token: str | None = None,
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency),
     ):
         return await UserVerification(db).verify_email(otp, token)
 
@@ -78,6 +82,7 @@ class UserRoutes:
         email: str,
         background_tasks: BackgroundTasks,
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency),
     ):
         return await UserVerification(db).resend_verification_email(
             email, background_tasks
@@ -103,6 +108,7 @@ class UserRoutes:
         payload: ForgotPasswordSchema,
         background_tasks: BackgroundTasks,
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency),
     ):
         return await UserService(db).forgot_password(payload, background_tasks)
 
@@ -112,5 +118,6 @@ class UserRoutes:
         self,
         payload: ResetPasswordSchema,
         db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency),
     ):
         return await UserService(db).reset_password(payload)
