@@ -3,6 +3,7 @@ from core.setup_gdal import setup_gdal
 # setup_gdal() #Only use it in development
 
 import asyncio
+import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -31,7 +32,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from utils.sms_service import send_sms
 
 load_dotenv()
-
+logger = logging.getLogger("startup")
+logging.basicConfig(level=logging.INFO)
 app = FastAPI(
     title=settings.PROJECT_NAME,
     exception_handlers={429: rate_limiter_manager.limit_exceeded_handler},
@@ -56,53 +58,59 @@ async def health_check():
 
 @app.on_event("startup")
 async def startup_event():
-    print("INFO:Waiting for application startup.")
-    await send_sms.connect()
-    await send_sms.ping()
+    logger.info("Waiting for application startup...")
 
+    # SMS
     try:
-        print(" Connecting to RabbitMQ...")
+        await send_sms.connect()
+        await send_sms.ping()
+        logger.info("SMS service connected.")
+    except Exception:
+        logger.exception("Failed to connect to SMS service")
+
+    # RabbitMQ
+    try:
         await rabbitmq.connect()
         await rabbitmq.declare_queue_with_dlq("location_events")
-        print("Connected to RabbitMQ.")
-    except Exception as e:
-        print(f"RabbitMQ connection failed: {e}")
+        logger.info("RabbitMQ connected.")
+    except Exception:
+        logger.exception("RabbitMQ connection failed")
+
+    # Blacklist cleanup
     try:
         async with AsyncSessionLocal() as db:
             cutoff = datetime.utcnow() - timedelta(days=7)
             auth_service = UserRepo(db)
             await auth_service.delete_expired_blacklisted_tokens(cutoff)
-            print("Blacklisted tokens cleanup completed.")
-    except Exception as e:
-        print(f"Unexpected error cleaning blacklisted tokens: {e}")
+            logger.info("Blacklisted tokens cleanup completed.")
+    except Exception:
+        logger.exception("Failed to clean up blacklisted tokens")
 
+    # Cache
     try:
-        print("Connecting to Upstash Redis...")
         await cache.connect()
-        print("Connected to Upstash Redis.")
-    except Exception as e:
-        print(f"Upstash Redis connection failed: {e}")
+        logger.info("Upstash Redis connected.")
+    except Exception:
+        logger.exception("Upstash Redis connection failed")
+
+    # Rate limiter
     try:
-        print("Connecting to Redis Cloud for rate limiting...")
         await rate_limiter_manager.connect()
-        print("Rate limiter (Redis Cloud) connected.")
-    except Exception as e:
-        print(f"Rate limiter connection failed: {e}")
+        logger.info("Rate limiter connected.")
+    except Exception:
+        logger.exception("Rate limiter connection failed")
+
+    # Optional pinger
     try:
         if os.getenv("RUN_LOCAL_PINGER", "false").lower() == "true":
             urls = settings.CRITICAL_SERVICE_URLS
             if urls and any(url.strip() for url in urls):
-                print("Starting lightweight periodic pinger...")
+                logger.info("Starting lightweight periodic pinger...")
                 asyncio.create_task(pinger.lightweight_periodic_ping())
-                print("Lightweight periodic pinger started.")
-            else:
-                print("Skipping pinger startup: No critical service URLs configured.")
-    except Exception as e:
-        print(f"Error occurred while starting lightweight periodic pinger: {e}")
+    except Exception:
+        logger.exception("Failed to start lightweight periodic pinger")
 
-    print("Application startup complete.")
-
-
+    logger.info("Application startup complete.")
 @app.on_event("shutdown")
 async def shutdown_event():
     if rabbitmq.connection and not rabbitmq.connection.is_closed:
