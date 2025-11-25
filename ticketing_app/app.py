@@ -98,7 +98,7 @@ async def startup_event():
             urls = settings.CRITICAL_SERVICE_URLS
             if urls and any(url.strip() for url in urls):
                 logger.info("Starting lightweight periodic pinger...")
-                asyncio.create_task(pinger.lightweight_periodic_ping())
+                asyncio.create_task(pinger.start())
     except Exception:
         logger.exception("Failed to start lightweight periodic pinger")
 
