@@ -13,7 +13,7 @@ class Pinger:
         self.failed_cycles = 0
         self.max_failed_cycles = 5
         self.disabled = False
-        self.interval = 12* 60 + 10 
+        self.interval = 14 * 60 + 10 
 
     async def ping_url(self, url: str) -> bool:
         try:
