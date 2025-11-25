@@ -46,7 +46,7 @@ class Pinger:
         failed = len(urls) - successful
         return successful, failed
 
-    async def periodic_ping(self):
+    async def lightweight_periodic_ping(self):
         while not self.disabled:
             now = datetime.now()
             successful, failed = await self.ping_all()
