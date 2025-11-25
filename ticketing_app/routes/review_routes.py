@@ -33,6 +33,11 @@ class ReviewRoutes:
         async def handler():
             if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
+            if not current_user.is_verified:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Email not verified. Please verify your account to access this.",
+                )
             return await ReviewService(db).add_review(
                 current_user, payload.event_id, payload.rating, payload.comment
             )
@@ -55,6 +60,11 @@ class ReviewRoutes:
         async def handler():
             if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
+            if not current_user.is_verified:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Email not verified. Please verify your account to access this.",
+                )
             reviews = await ReviewService(db).get_event_reviews(event_id)
             if not reviews:
                 raise HTTPException(status_code=404, detail="Not Found")

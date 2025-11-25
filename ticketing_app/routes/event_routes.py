@@ -33,6 +33,11 @@ class EventRoutes:
         async def handler():
             if current_user.role.name not in ["admin", "organizer"]:
                 raise HTTPException(status_code=403, detail="Not permitted")
+            if not current_user.is_verified:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Email not verified. Please verify your account to access this.",
+                )
             return await EventService(db).create_event(current_user, data)
 
         return await breaker.call(handler)
@@ -49,8 +54,6 @@ class EventRoutes:
             if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             events = await EventService(db).list_events()
-            if not events:
-                raise HTTPException(status_code=404, detail="No Events Found")
             return events
 
         return await breaker.call(handler)

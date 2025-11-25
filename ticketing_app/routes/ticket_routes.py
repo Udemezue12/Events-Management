@@ -35,6 +35,11 @@ class TicketsRoutes:
         async def handler():
             if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
+            if not current_user.is_verified:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Email not verified. Please verify your account to access this.",
+                )
             ticket = await TicketService(db).reserve_ticket(
                 user_id=current_user.id,
                 event_id=data.event_id,
@@ -49,12 +54,18 @@ class TicketsRoutes:
     async def mark_ticket_paid(
         self,
         ticket_id: int,
+        current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer"]:
+            if current_user.role.name not in {"admin", "organizer"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
+            if not current_user.is_verified:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Email not verified. Please verify your account to access this.",
+                )
             result = await TicketService(db).mark_as_paid(ticket_id=ticket_id)
             return {"message": "Ticket Paid successfully", **result}
 
