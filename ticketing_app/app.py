@@ -1,5 +1,6 @@
-from core.setup_gdal import setup_gdal
-# setup_gdal() #Only use it in development
+# from core.setup_gdal import setup_gdal
+
+# setup_gdal()  # Only use it in development
 import asyncio
 import logging
 import os
@@ -57,7 +58,6 @@ async def health_check():
 async def startup_event():
     logger.info("Waiting for application startup...")
 
-    
     try:
         await send_sms.connect()
         await send_sms.ping()
@@ -65,7 +65,6 @@ async def startup_event():
     except Exception:
         logger.exception("Failed to connect to SMS service")
 
-  
     try:
         await rabbitmq.connect()
         await rabbitmq.declare_queue_with_dlq("location_events")
@@ -73,7 +72,6 @@ async def startup_event():
     except Exception:
         logger.exception("RabbitMQ connection failed")
 
-   
     try:
         async with AsyncSessionLocal() as db:
             cutoff = datetime.utcnow() - timedelta(days=7)
@@ -83,20 +81,17 @@ async def startup_event():
     except Exception:
         logger.exception("Failed to clean up blacklisted tokens")
 
-
     try:
         await cache.connect()
         logger.info("Upstash Redis connected.")
     except Exception:
         logger.exception("Upstash Redis connection failed")
 
-
     try:
         await rate_limiter_manager.connect()
         logger.info("Rate limiter connected.")
     except Exception:
         logger.exception("Rate limiter connection failed")
-
 
     try:
         if os.getenv("RUN_LOCAL_PINGER", "false").lower() == "true":
@@ -108,6 +103,8 @@ async def startup_event():
         logger.exception("Failed to start lightweight periodic pinger")
 
     logger.info("Application startup complete.")
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
     if rabbitmq.connection and not rabbitmq.connection.is_closed:
@@ -118,7 +115,6 @@ async def shutdown_event():
 async def index():
     with open("templates/index.html", "r", encoding="utf-8") as f:
         return f.read()
-
 
 
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)

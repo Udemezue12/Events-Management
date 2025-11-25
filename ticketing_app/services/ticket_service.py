@@ -53,7 +53,7 @@ class TicketService:
                         f"[Cache warning] Could not update event cache: {cache_error}"
                     )
 
-                return ticket
+                return  ticket.as_dict()
             except Exception as e:
                 print(f"Error reserving ticket: {e}")
                 raise e
