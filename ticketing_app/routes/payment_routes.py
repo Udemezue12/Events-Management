@@ -42,6 +42,11 @@ class PaymentsRoutes:
         async def handler():
             if current_user.role.name not in ["admin", "organizer", "attendee"]:
                 raise HTTPException(status_code=403, detail="Not permitted")
+            if not current_user.is_verified:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Email not verified. Please verify your account to access this.",
+                )
             return await PaymentService(db).initialize_payment(
                 current_user,
                 ticket_id=data.ticket_id,
@@ -64,6 +69,11 @@ class PaymentsRoutes:
         async def handler():
             if current_user.role.name not in ["admin", "organizer", "attendee"]:
                 raise HTTPException(status_code=403, detail="Not permitted")
+            if not current_user.is_verified:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Email not verified. Please verify your account to access this.",
+                )
             references = await PaymentService(db).verify_payment(reference=reference)
             if not references:
                 raise HTTPException(status_code=404, detail="Not Found")

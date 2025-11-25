@@ -73,11 +73,11 @@ class UserService:
             if not user or not user.check_password(data.password):
                 raise HTTPException(status_code=401, detail="Invalid credentials")
 
-            if not user.is_verified:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Email not verified. Please verify your account to login.",
-                )
+            # if not user.is_verified:
+            #     raise HTTPException(
+            #         status_code=403,
+            #         detail="Email not verified. Please verify your account to login.",
+            #     )
 
             access_token = jwt.encode(
                 {"sub": str(user.id), "type": "access", "exp": access_exp},
