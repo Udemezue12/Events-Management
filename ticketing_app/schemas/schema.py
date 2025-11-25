@@ -96,6 +96,21 @@ class EventCreate(BaseModel):
     venue_id: int
 
     ticket_price: Optional[float] = 0.0
+    @model_validator(mode="after")
+    def validate_event(self):
+        if self.total_tickets <= 0:
+            raise ValueError("Total tickets must be greater than 0.")
+
+        if self.ticket_price is not None and self.ticket_price < 0:
+            raise ValueError("Ticket price cannot be negative.")
+
+        if self.end_time <= self.start_time:
+            raise ValueError("Event end_time must be after start_time.")
+
+        if self.start_time < datetime.utcnow():
+            raise ValueError("Event cannot start in the past.")
+
+        return self
 
 
 class EventOut(BaseModel):
@@ -106,6 +121,8 @@ class EventOut(BaseModel):
     end_time: datetime
     venue_id: Optional[int]
     created_by: Optional[int]
+    class Config:
+        from_attributes = True
 
     @classmethod
     def from_orm(cls, event: Event):
@@ -137,7 +154,7 @@ class TicketOut(BaseModel):
 
 class TicketCreate(BaseModel):
     event_id: int
-    quantity: int = 1
+    quantity: int = Field(1, gt=0)
     # payment_method: Literal["paystack", "flutterwave"]
 
 
@@ -224,8 +241,8 @@ class PaymentInitOut(BaseModel):
 
 class ReviewCreate(BaseModel):
     event_id: int
-    rating: int
-    comment: Optional[str] = None
+    rating: int= Field(..., ge=1, le=5)
+    comment: Optional[str] =  Field(default=None, max_length=500)
 
 
 class ReviewOut(BaseModel):
