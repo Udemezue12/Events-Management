@@ -40,7 +40,7 @@ class PaymentsRoutes:
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             if not current_user.is_verified:
                 raise HTTPException(
@@ -67,7 +67,7 @@ class PaymentsRoutes:
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             if not current_user.is_verified:
                 raise HTTPException(
@@ -95,7 +95,7 @@ class PaymentsRoutes:
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
 
             payments = await PaymentService(db).refund_payment(
@@ -144,7 +144,7 @@ class PaymentsRoutes:
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             payments = await PaymentService(db).get_user_payments(
                 user_id=current_user.id, page=page, page_size=page_size

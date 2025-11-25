@@ -31,7 +31,7 @@ class ReviewRoutes:
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             return await ReviewService(db).add_review(
                 current_user, payload.event_id, payload.rating, payload.comment
@@ -53,7 +53,7 @@ class ReviewRoutes:
         current_user: User = Depends(get_current_user),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             reviews = await ReviewService(db).get_event_reviews(event_id)
             if not reviews:
@@ -71,7 +71,7 @@ class ReviewRoutes:
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             return await ReviewService(db).get_user_reviews(current_user.id)
 

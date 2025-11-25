@@ -46,7 +46,7 @@ class EventRoutes:
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             events = await EventService(db).list_events()
             if not events:
@@ -66,7 +66,7 @@ class EventRoutes:
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             nearby_events = await EventService(db).nearby_events(lat, lon)
             if not nearby_events:

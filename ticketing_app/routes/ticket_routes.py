@@ -30,11 +30,10 @@ class TicketsRoutes:
         data: TicketCreate,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
-        
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             ticket = await TicketService(db).reserve_ticket(
                 user_id=current_user.id,
@@ -51,7 +50,7 @@ class TicketsRoutes:
         self,
         ticket_id: int,
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
             if current_user.role.name not in ["admin", "organizer"]:
@@ -73,10 +72,10 @@ class TicketsRoutes:
         per_page: int = 20,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
-            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+            if current_user.role.name not in {"admin", "organizer", "attendee"}:
                 raise HTTPException(status_code=403, detail="Not permitted")
             tickets = await TicketService(db).get_user_ticket(
                 user_id=current_user.id, page=page, per_page=per_page
@@ -99,7 +98,7 @@ class TicketsRoutes:
         per_page: int = 20,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
             if current_user.role.name != "admin":
@@ -126,7 +125,7 @@ class TicketsRoutes:
         per_page: int = 20,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
             if current_user.role.name not in ["admin", "organizer"]:
