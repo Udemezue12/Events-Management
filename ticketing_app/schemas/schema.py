@@ -23,7 +23,7 @@ class UserCreate(UserBase):
         ..., min_length=7, json_schema_extra={"type": "string", "format": "password"}
     )
     phone_number: str
-    # model_config = {"json_schema_extra": {"exclude": ["name"]}}
+  
 
     @field_validator("phone_number")
     def validate_phone(cls, value: str):

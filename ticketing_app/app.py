@@ -1,7 +1,5 @@
 from core.setup_gdal import setup_gdal
-
 # setup_gdal() #Only use it in development
-
 import asyncio
 import logging
 import os
@@ -27,7 +25,6 @@ from routes.review_routes import router as review_router
 from routes.ticket_routes import router as ticket_router
 from routes.user_routes import router as user_router
 from routes.venue_routes import router as venue_router
-from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.sessions import SessionMiddleware
 from utils.sms_service import send_sms
 
@@ -60,7 +57,7 @@ async def health_check():
 async def startup_event():
     logger.info("Waiting for application startup...")
 
-    # SMS
+    
     try:
         await send_sms.connect()
         await send_sms.ping()
@@ -68,7 +65,7 @@ async def startup_event():
     except Exception:
         logger.exception("Failed to connect to SMS service")
 
-    # RabbitMQ
+  
     try:
         await rabbitmq.connect()
         await rabbitmq.declare_queue_with_dlq("location_events")
@@ -76,7 +73,7 @@ async def startup_event():
     except Exception:
         logger.exception("RabbitMQ connection failed")
 
-    # Blacklist cleanup
+   
     try:
         async with AsyncSessionLocal() as db:
             cutoff = datetime.utcnow() - timedelta(days=7)
@@ -86,21 +83,21 @@ async def startup_event():
     except Exception:
         logger.exception("Failed to clean up blacklisted tokens")
 
-    # Cache
+
     try:
         await cache.connect()
         logger.info("Upstash Redis connected.")
     except Exception:
         logger.exception("Upstash Redis connection failed")
 
-    # Rate limiter
+
     try:
         await rate_limiter_manager.connect()
         logger.info("Rate limiter connected.")
     except Exception:
         logger.exception("Rate limiter connection failed")
 
-    # Optional pinger
+
     try:
         if os.getenv("RUN_LOCAL_PINGER", "false").lower() == "true":
             urls = settings.CRITICAL_SERVICE_URLS
