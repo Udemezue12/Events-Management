@@ -41,10 +41,13 @@ class EventRoutes:
     @safe_handler
     async def list_events(
         self,
+        current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             events = await EventService(db).list_events()
             if not events:
                 raise HTTPException(status_code=404, detail="No Events Found")
@@ -58,10 +61,13 @@ class EventRoutes:
         self,
         lat: float,
         lon: float,
+        current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
         _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             nearby_events = await EventService(db).nearby_events(lat, lon)
             if not nearby_events:
                 raise HTTPException(status_code=404, detail="No Events Found")

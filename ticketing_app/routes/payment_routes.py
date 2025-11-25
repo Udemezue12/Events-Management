@@ -37,9 +37,11 @@ class PaymentsRoutes:
         data: PaymentInit,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             return await PaymentService(db).initialize_payment(
                 current_user,
                 ticket_id=data.ticket_id,
@@ -55,10 +57,13 @@ class PaymentsRoutes:
     async def verify_payments(
         self,
         reference: str,
+        current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             references = await PaymentService(db).verify_payment(reference=reference)
             if not references:
                 raise HTTPException(status_code=404, detail="Not Found")
@@ -66,7 +71,6 @@ class PaymentsRoutes:
 
         return await breaker.call(handler)
 
-    
     @router.post(
         "/refund-payments/{payment_id}",
         dependencies=[rate_limit],
@@ -76,10 +80,14 @@ class PaymentsRoutes:
     async def refund_payment_endpoint(
         self,
         data: PaymentRefund,
+        current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
+
             payments = await PaymentService(db).refund_payment(
                 payment_id=data.payment_id,
             )
@@ -99,9 +107,11 @@ class PaymentsRoutes:
         self,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             payments = await PaymentService(db).get_organizer_payments(
                 organizer_id=current_user.id
             )
@@ -121,9 +131,11 @@ class PaymentsRoutes:
         page_size: int = Query(50, ge=1, le=200),
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             payments = await PaymentService(db).get_user_payments(
                 user_id=current_user.id, page=page, page_size=page_size
             )
@@ -143,7 +155,7 @@ class PaymentsRoutes:
         page_size: int = Query(50, ge=1, le=200),
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
             if current_user.role.name != "admin":

@@ -18,14 +18,15 @@ class VenueRepo:
     async def get_by_name(self, name: str) -> Venue | None:
         result = await self.db.execute(select(Venue).where(Venue.name == name))
         return result.scalar_one_or_none()
+    async def get_by_address(self, address: str) -> Venue | None:
+        result = await self.db.execute(select(Venue).where(Venue.address == address))
+        return result.scalar_one_or_none()
 
     async def get_by_location(self, location: str) -> Venue | None:
         result = await self.db.execute(select(Venue).where(Venue.location == location))
         return result.scalar_one_or_none()
 
-    async def get_by_address(self, address: str) -> Venue | None:
-        result = await self.db.execute(select(Venue).where(Venue.address == address))
-        return result.scalar_one_or_none()
+
 
     async def create(self, name: str, address: str, capacity: int, created_by: int):
         point = await geocode_address(address)

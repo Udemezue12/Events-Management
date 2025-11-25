@@ -31,6 +31,8 @@ class VenueRoutes:
         _: None = Depends(validate_csrf_dependency)
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             return await VenueService(db).create_venue(
                 name=payload.name,
                 address=payload.address,

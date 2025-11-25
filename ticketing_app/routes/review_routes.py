@@ -28,9 +28,11 @@ class ReviewRoutes:
         payload: ReviewCreate,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             return await ReviewService(db).add_review(
                 current_user, payload.event_id, payload.rating, payload.comment
             )
@@ -44,9 +46,15 @@ class ReviewRoutes:
     )
     @safe_handler
     async def get_event_reviews(
-        self, event_id: int, db: AsyncSession = Depends(get_db_async),_: None = Depends(validate_csrf_dependency)
+        self,
+        event_id: int,
+        db: AsyncSession = Depends(get_db_async),
+        _: None = Depends(validate_csrf_dependency),
+        current_user: User = Depends(get_current_user),
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             reviews = await ReviewService(db).get_event_reviews(event_id)
             if not reviews:
                 raise HTTPException(status_code=404, detail="Not Found")
@@ -54,17 +62,17 @@ class ReviewRoutes:
 
         return await breaker.call(handler)
 
-    @router.get(
-        "/user", dependencies=[rate_limit], response_model=List[ReviewOut]
-    )
+    @router.get("/user", dependencies=[rate_limit], response_model=List[ReviewOut])
     @safe_handler
     async def get_user_reviews(
         self,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db_async),
-        _: None = Depends(validate_csrf_dependency)
+        _: None = Depends(validate_csrf_dependency),
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             return await ReviewService(db).get_user_reviews(current_user.id)
 
         return await breaker.call(handler)

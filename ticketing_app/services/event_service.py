@@ -14,8 +14,7 @@ class EventService:
 
     async def create_event(self, user: User, payload):
         async def handler():
-            if user.role.name not in ["admin", "organizer"]:
-                raise PermissionError("Not Permitted")
+       
             event = await self.repository.create(
                 payload,
                 creator_id=user.id,
@@ -51,6 +50,8 @@ class EventService:
 
             events = await self.repository.get_all()
             events_out = [EventOut.from_orm(e).model_dump(mode="json") for e in events]
+            if not events_out:
+                return []
             await cache.set_json(cache_key, events_out, ttl=120)
             return events_out
 

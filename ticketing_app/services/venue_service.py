@@ -22,6 +22,8 @@ class VenueService:
 
             venues = await self.repo.get_all()
             venue_dicts = [v.as_dict() for v in venues]
+            if not venue_dicts:
+                return []
 
             await cache.set_json(cache_key, venue_dicts, ttl=300)
             return venue_dicts
@@ -34,7 +36,8 @@ class VenueService:
         async def handler():
             if await self.repo.get_by_name(name=name):
                 raise HTTPException(status_code=400, detail="Name already taken")
-
+            if await self.repo.get_by_address(address=address):
+                raise HTTPException(status_code=400, detail="Address already taken")
             # if location:
             #     geopy_data = await geocode_location(location)
             #     if geopy_data:

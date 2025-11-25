@@ -34,6 +34,8 @@ class TicketsRoutes:
         
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             ticket = await TicketService(db).reserve_ticket(
                 user_id=current_user.id,
                 event_id=data.event_id,
@@ -52,6 +54,8 @@ class TicketsRoutes:
         _: None = Depends(validate_csrf_dependency)
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             result = await TicketService(db).mark_as_paid(ticket_id=ticket_id)
             return {"message": "Ticket Paid successfully", **result}
 
@@ -72,6 +76,8 @@ class TicketsRoutes:
         _: None = Depends(validate_csrf_dependency)
     ):
         async def handler():
+            if current_user.role.name not in ["admin", "organizer", "attendee"]:
+                raise HTTPException(status_code=403, detail="Not permitted")
             tickets = await TicketService(db).get_user_ticket(
                 user_id=current_user.id, page=page, per_page=per_page
             )

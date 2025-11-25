@@ -17,6 +17,14 @@ class ReviewService:
         self, user: User, event_id: int, rating: int, comment: str | None = None
     ):
         async def handler():
+            event = await self.repo.get_event_by_id(event_id)
+            if not event:
+                raise ValueError("Event not found.")
+            if event.created_by == user.id:
+                raise ValueError("You cannot review your own event.")
+            existing = await self.repo.get_user_review_for_event(user.id, event_id)
+            if existing:
+                raise ValueError("You have already reviewed this event.")
             review = await self.repo.create_review(user.id, event_id, rating, comment)
 
             await asyncio.create_task(
@@ -46,6 +54,8 @@ class ReviewService:
                 return cached
 
             reviews = await self.repo.get_reviews_by_event(event_id)
+            if not reviews:
+                return []
             await cache.set_json(cache_key, reviews, ttl=300)
 
             await asyncio.create_task(
@@ -70,6 +80,8 @@ class ReviewService:
                 return cached
 
             reviews = await self.repo.get_reviews_by_user(user_id)
+            if not reviews:
+                return []
             await cache.set_json(cache_key, reviews, ttl=300)
 
             await asyncio.create_task(
