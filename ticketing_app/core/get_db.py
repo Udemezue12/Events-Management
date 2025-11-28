@@ -12,7 +12,7 @@ from .settings import settings
 DATABASE_URL = settings.DATABASE_URL
 RENDER_DATABASE_URL = settings.RENDER_DATABASE_URL
 async_engine: AsyncEngine = create_async_engine(
-    DATABASE_URL,
+    RENDER_DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
 )
