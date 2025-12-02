@@ -58,16 +58,17 @@ class UserVerification:
                 raise HTTPException(status_code=404, detail="User not found")
             if user.is_verified:
                 return {"message": "Email already verified."}
+            name= f"{user.first_name} {user.last_name}"
 
             otp = await user_generate.generate_otp(email)
-            token = user_generate.generate_verify_token(email)
-            background_tasks.add_task(send_verification_email, email, otp, token)
+            token = await user_generate.generate_verify_token(email)
+            background_tasks.add_task(send_verification_email, email, otp, token, name)
             if hasattr(user, "phone_number") and user.phone_number:
                 background_tasks.add_task(
                     send_sms.send_sms,
                     user.phone_number,
                     otp,
-                    user.name,
+                    name,
                 )
             return {"message": "Email Verification sent to your mailbox and sms"}
 
@@ -81,7 +82,7 @@ class UserVerification:
             user = await self.repo.get_by_email(email)
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
-
+            name= f"{user.first_name} {user.last_name}"
             otp = await user_generate.generate_otp(email)
             token = await user_generate.generate_reset_token(email)
             background_tasks.add_task(send_password_reset_link, email, otp, token)
@@ -90,7 +91,7 @@ class UserVerification:
                     send_sms.send_sms,
                     user.phone_number,
                     otp,
-                    user.name,
+                    name,
                 )
             return {
                 "message": "Password reset link via your email resent successfully."

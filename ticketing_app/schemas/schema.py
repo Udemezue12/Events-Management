@@ -15,15 +15,13 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    firstName: str = Field(..., min_length=5)
-    lastName: str = Field(..., min_length=5)
-    name: str | None = Field(default=None, exclude=True)
+    first_name: str = Field(..., min_length=5)
+    last_name: str = Field(..., min_length=5)
     username: str = Field(..., min_length=5, max_length=20)
     password: str = Field(
         ..., min_length=7, json_schema_extra={"type": "string", "format": "password"}
     )
     phone_number: str
-  
 
     @field_validator("phone_number")
     def validate_phone(cls, value: str):
@@ -36,6 +34,10 @@ class UserCreate(UserBase):
             )
         except Exception:
             raise ValueError("Invalid phone number format. Use e.g. +2348012345678")
+
+    @field_validator("first_name", "last_name", mode="before")
+    def capitalize_names(cls, value: str):
+        return value.strip().title()
 
     @field_validator("password")
     def validate_password(cls, v: str):
@@ -58,7 +60,7 @@ class UserCreate(UserBase):
     def finalize_fields(self):
         if not self.username:
             object.__setattr__(self, "username", self.email.split("@")[0])
-        object.__setattr__(self, "name", f"{self.firstName} {self.lastName}".strip())
+        # object.__setattr__(self, "name", f"{self.firstName} {self.lastName}".strip())
         return self
 
 
@@ -96,6 +98,7 @@ class EventCreate(BaseModel):
     venue_id: int
 
     ticket_price: Optional[float] = 0.0
+
     @model_validator(mode="after")
     def validate_event(self):
         if self.total_tickets <= 0:
@@ -121,6 +124,7 @@ class EventOut(BaseModel):
     end_time: datetime
     venue_id: Optional[int]
     created_by: Optional[int]
+
     class Config:
         from_attributes = True
 
@@ -155,7 +159,6 @@ class TicketOut(BaseModel):
 class TicketCreate(BaseModel):
     event_id: int
     quantity: int = Field(1, gt=0)
-    # payment_method: Literal["paystack", "flutterwave"]
 
 
 class MarkTicket(BaseModel):
@@ -241,8 +244,8 @@ class PaymentInitOut(BaseModel):
 
 class ReviewCreate(BaseModel):
     event_id: int
-    rating: int= Field(..., ge=1, le=5)
-    comment: Optional[str] =  Field(default=None, max_length=500)
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = Field(default=None, max_length=500)
 
 
 class ReviewOut(BaseModel):

@@ -1,8 +1,10 @@
 /ticket-env/
 /ticketing_app/__pycache__/
 /ticketing_app/.env
+/ticketing_app/alembic.inissss
 /ticketing_app/mmmm
 /ticketing_app/event_app-env
+/ticketing_app/alembic.inissss
 /.mypy_cache/
 /ticketing_app/rough_work.py
 /events-env/

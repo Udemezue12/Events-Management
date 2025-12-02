@@ -1,6 +1,6 @@
-# from core.setup_gdal import setup_gdal
+from core.setup_gdal import setup_gdal
 
-# setup_gdal()  # Only use it in development
+setup_gdal()  # Only use it in development
 import asyncio
 import logging
 import os
@@ -93,14 +93,14 @@ async def startup_event():
     except Exception:
         logger.exception("Rate limiter connection failed")
 
-    try:
-        if os.getenv("RUN_LOCAL_PINGER", "false").lower() == "true":
-            urls = settings.CRITICAL_SERVICE_URLS
-            if urls and any(url.strip() for url in urls):
-                logger.info("Starting lightweight periodic pinger...")
-                asyncio.create_task(pinger.start())
-    except Exception:
-        logger.exception("Failed to start lightweight periodic pinger")
+    # try:
+    #     if os.getenv("RUN_LOCAL_PINGER", "false").lower() == "true":
+    #         urls = settings.CRITICAL_SERVICE_URLS
+    #         if urls and any(url.strip() for url in urls):
+    #             logger.info("Starting lightweight periodic pinger...")
+    #             asyncio.create_task(pinger.start())
+    # except Exception:
+    #     logger.exception("Failed to start lightweight periodic pinger")
 
     logger.info("Application startup complete.")
 
@@ -124,6 +124,15 @@ app.add_middleware(
     algorithm=settings.ALGORITHM,
     access_exp_minutes=settings.ACCESS_EXPIRE_MINUTES,
     secure_cookies=settings.SECURE_COOKIES,
+    skip_paths={
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/logout",
+        "/api/auth/logout",
+        "/health",
+        "/static",
+    },
 )
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ from core.breaker import breaker
 from core.settings import settings
 
 
-async def send_verification_email(email: str, otp: str, token: str):
+async def send_verification_email(email: str, otp: str, token: str, name:str):
     async def handler():
         verify_link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
 
@@ -14,7 +14,7 @@ async def send_verification_email(email: str, otp: str, token: str):
         <html>
         <body style="font-family: Arial, sans-serif; line-height: 1.6;">
             <h2>Email Verification</h2>
-            <p>Hello,</p>
+            <p>Hello {name},</p>
             <p>Your one-time password (OTP) is:</p>
             <h3 style="color:#007bff;">{otp}</h3>
             <p>You can also verify your email by clicking the link below:</p>

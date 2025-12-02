@@ -45,9 +45,12 @@ class AutoRefreshAccessTokenMiddleware(BaseHTTPMiddleware):
                 self._set_access_cookie(response, new_access)
                 return response
             else:
-                return JSONResponse(
+                # if request.url.path.startswith("/api/"):
+                resp = JSONResponse(
                     {"detail": "Refresh token expired"}, status_code=401
                 )
+                resp.delete_cookie("refresh_token")
+                return resp
 
         response = await call_next(request)
         return response

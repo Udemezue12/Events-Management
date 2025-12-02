@@ -13,9 +13,13 @@ class UserRepo:
         result = await self.db.execute(select(User).where(User.username == username))
         return result.scalar_one_or_none()
 
-    async def get_by_name(self, name: str) -> User | None:
-        result = await self.db.execute(select(User).where(User.name == name))
+    async def get_by_firstName(self, first_name: str) -> User | None:
+        result = await self.db.execute(select(User).where(User.first_name == first_name))
         return result.scalar_one_or_none()
+    async def get_by_lastName(self, last_name: str) -> User | None:
+        result = await self.db.execute(select(User).where(User.last_name == last_name))
+        return result.scalar_one_or_none()
+    
 
     async def get_by_email(self, email: str) -> User | None:
         result = await self.db.execute(select(User).where(User.email == email))

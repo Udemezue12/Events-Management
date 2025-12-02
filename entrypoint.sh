@@ -11,10 +11,10 @@ cd /app/ticketing_app
 # ------------------------------
 # Run Alembic migrations
 # ------------------------------
-echo "Applying database migrations using Alembic..."
-alembic revision --autogenerate -m "Added new models"
-alembic upgrade head
-echo "Database migrations completed."
+# echo "Applying database migrations using Alembic..."
+# alembic revision --autogenerate -m "Added new models"
+# alembic upgrade head
+# echo "Database migrations completed."
 
 # ------------------------------
 # Start Supervisor to manage Uvicorn + Celery

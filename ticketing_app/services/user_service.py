@@ -25,7 +25,7 @@ refresh_exp = settings.refresh_expiration_jwt_expiration
 
 class UserService:
     def __init__(self, db):
-        self.repo: UserRepo = UserRepo(db)
+        self.repo: UserRepo = (db)
         self.user_verification: UserVerification = UserVerification(db)
 
     async def register(self, data, background_tasks: BackgroundTasks):
@@ -34,8 +34,10 @@ class UserService:
                 raise HTTPException(status_code=400, detail="Email already registered")
             if await self.repo.get_by_username(username=data.username):
                 raise HTTPException(status_code=400, detail="Username already taken")
-            if await self.repo.get_by_name(name=data.name):
-                raise HTTPException(status_code=400, detail="Name already taken")
+            if await self.repo.get_by_lastName(last_name=data.last_name):
+                raise HTTPException(status_code=400, detail="LastName already taken")
+            if await self.repo.get_by_firstName(first_name=data.first_name):
+                raise HTTPException(status_code=400, detail="FirstName already taken")
             if await self.repo.get_by_phoneNumber(phone_number=data.phone_number):
                 raise HTTPException(
                     status_code=400, detail="Phone number already taken"
@@ -44,23 +46,25 @@ class UserService:
                 username=data.username,
                 email=data.email,
                 phone_number=data.phone_number,
-                name=f"{data.lastName} {data.firstName}",
+                first_name=data.first_name,
+                last_name=data.last_name,
                 role=data.role,
                 is_verified=False,
             )
+            name= f"{data.first_name} {data.last_name}"
             user.set_password(password=data.password)
             await self.repo.create(user)
             otp = await user_generate.generate_otp(user.email)
             token = await user_generate.generate_verify_token(user.email)
-            background_tasks.add_task(send_verification_email, user.email, otp, token)
+            background_tasks.add_task(send_verification_email, user.email, otp, token, name)
             if hasattr(data, "phone_number") and data.phone_number:
                 background_tasks.add_task(
-                    send_sms.send_sms, data.phone_number, otp, data.name
+                    send_sms.send_sms, data.phone_number, otp, name
                 )
 
             return JSONResponse(
                 {
-                    "message": "Registration successful! Please check your email to verify your account."
+                    "message": "Registration successful! Please check your email and sms to verify your account."
                 },
                 status_code=201,
             )
@@ -179,13 +183,13 @@ class UserService:
             user = await self.repo.get_by_email(payload.email)
             if not user:
                 raise HTTPException(status_code=404, detail="Email not found")
-
+            name= f"{user.first_name} {user.last_name}"
             token = await user_generate.generate_reset_token(user.email)
             otp = await user_generate.generate_otp(user.email)
             background_tasks.add_task(send_password_reset_link, user.email, otp, token)
             if user.phone_number:
                 background_tasks.add_task(
-                    send_sms.send_sms, user.phone_number, otp, user.name
+                    send_sms.send_sms, user.phone_number, otp, name
                 )
             return {"message": "Password reset email sent."}
 

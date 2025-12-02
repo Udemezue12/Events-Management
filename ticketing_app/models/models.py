@@ -27,7 +27,8 @@ class User(Base):
     __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    first_name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    last_name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -64,9 +65,10 @@ class User(Base):
         return check_password_hash(self.hashed_password, password)
 
     def normalize(self) -> None:
-        self.name = self.name.strip().lower()
         self.username = self.username.strip().lower()
         self.email = self.email.strip().lower()
+        self.first_name = self.first_name.strip().title()
+        self.last_name = self.last_name.strip().title()
 
 
 class BlacklistedToken(Base):
@@ -190,7 +192,7 @@ class Ticket(Base):
     def as_dict(self):
         return {
             "id": self.id,
-            "user_name": self.user.name if self.user else None,
+            "user_name": f"{self.user.first_name} {self.user.last_name}" if self.user else None,
             "user_email": self.user.email if self.user else None,
             "event_name": self.event.title if self.event else None,
             "type": self.type.value,
@@ -231,13 +233,14 @@ class Payment(Base, BaseMixin):
 
     def as_dict(self, include_ids: bool = False):
         event = self.event or (self.ticket.event if self.ticket else None)
+        name = f"{self.user.first_name} {self.user.last_name}" if self.user else None
         data = {
             "id": self.id,
-            "user_name": self.user.name if self.user else None,
+            "user_name": name,
             "status": self.status.value if self.status else None,
             "ticket_quantity": self.ticket_quantity,
             "event_name": event.title if event else None,
-            "event_creator": event.creator.name if event and event.creator else None,
+            "event_creator": f"{event.creator.first_name} {event.creator.last_name}" if event and event.creator else None,
             "venue": event.venue.name if event and event.venue else None,  # rename key
             "amount": self.amount,
             "payment_method": self.payment_method,
@@ -284,7 +287,7 @@ class Review(Base):
             "id": self.id,
             "event_id": self.event_id,
             "event_name": event.title,
-            "user_name": user.name,
+            "user_name": f"{user.last_name} {user.first_name}",
             "user_id": self.user_id,
             "rating": self.rating,
             "comment": self.comment,
