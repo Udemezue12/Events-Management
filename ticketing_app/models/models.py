@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from core.get_db import Base
 from geoalchemy2 import Geography
@@ -13,12 +13,16 @@ from sqlalchemy import (
     Integer,
     String,
     func,
+    CheckConstraint,
+    UniqueConstraint
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from werkzeug.security import check_password_hash, generate_password_hash
+from sqlalchemy.dialects.postgresql import TSRANGE, ExcludeConstraint
+from sqlalchemy import Computed, text
 
 from .base import BaseMixin
-from .enums import EventStatus, PaymentStatus, Role, TicketType
+from .enums import EventStatus, PaymentStatus, Role, TicketType, TicketStatus, PaymentMethod, PDFStatus
 from .shape import convert_location
 
 
@@ -27,8 +31,10 @@ class User(Base):
     __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    first_name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
-    last_name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    first_name: Mapped[str] = mapped_column(
+        String, unique=True, index=True, nullable=False)
+    last_name: Mapped[str] = mapped_column(
+        String, unique=True, index=True, nullable=False)
     username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -36,11 +42,12 @@ class User(Base):
         String(20), unique=True, nullable=True
     )
     role: Mapped[Role] = mapped_column(
-        Enum(Role, native_enum=False), default=Role.attendee
+        Enum(Role, native_enum=False), default=Role.ATTENDEE
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
@@ -73,14 +80,59 @@ class User(Base):
 
 class BlacklistedToken(Base):
     __tablename__ = "blacklisted_tokens"
-    __table_args__ = {"extend_existing": True}
+
+    __table_args__ = (
+        Index("idx_blacklisted_token", "token"),
+        {"extend_existing": True},
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    token: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
-    blacklisted_on: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+
+    token: Mapped[str] = mapped_column(
+        String(512),
+        unique=True,
+        nullable=False,
     )
-    __table_args__ = (Index("idx_blacklisted_token", "token"),)
+
+    blacklisted_on: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class State(Base):
+    __tablename__ = "states"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, index=True
+    )
+    name: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow(), onupdate=datetime.utcnow()
+    )
+    location: Mapped[Optional[object]] = mapped_column(
+        Geography(geometry_type="POINT", srid=4326), nullable=True
+    )
+
+    venues: Mapped[List["Venue"]] = relationship(
+        "Venue", back_populates="state", cascade="all, delete-orphan"
+    )
+
+    def __str__(self):
+        return self.name
+
+    def as_dict(self):
+        return {
+            "id": str(self.id),
+            "name": self.name,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "location": convert_location(self.location),
+        }
 
 
 class Venue(Base):
@@ -90,8 +142,22 @@ class Venue(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     address: Mapped[str] = mapped_column(String, nullable=False)
+    image_url: Mapped[str] = mapped_column(String, nullable=True)
+    image_hash: Mapped[str] = mapped_column(String, nullable=True)
+    public_id: Mapped[str] = mapped_column(String, nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
     capacity: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow)
+    is_available: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+    is_verified: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
@@ -105,6 +171,16 @@ class Venue(Base):
     events: Mapped[List["Event"]] = relationship(
         "Event", back_populates="venue", cascade="all, delete-orphan"
     )
+    state_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("states.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    state: Mapped["State"] = relationship("State", back_populates="venues")
+
+    def __str__(self):
+        return self.name
 
     def as_dict(self):
         return {
@@ -121,21 +197,42 @@ class Venue(Base):
 
 class Event(Base, BaseMixin):
     __tablename__ = "events"
-    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
     end_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     total_tickets: Mapped[int] = mapped_column(Integer, nullable=False)
-    tickets_sold: Mapped[int] = mapped_column(Integer, default=0)
+    total_tickets_sold: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[EventStatus] = mapped_column(
-        Enum(EventStatus, native_enum=False), default=EventStatus.upcoming
+        Enum(EventStatus, native_enum=False), default=EventStatus.UPCOMING
     )
-    ticket_price: Mapped[float] = mapped_column(Float, default=0.0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    time_range: Mapped[object] = mapped_column(
+        TSRANGE,
+        Computed("tsrange(start_time, end_time)", persisted=True),
+    )
+
+    total_ticket_price: Mapped[Optional[float]] = mapped_column(
+        Float,
+        default=0.0,
+        nullable=True,
+    )
+    total_ticket_price_sold: Mapped[Optional[float]] = mapped_column(
+        Float,
+        default=0.0,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    image_url: Mapped[str] = mapped_column(String, nullable=True)
+    image_hash: Mapped[str] = mapped_column(String, nullable=True)
+    public_id: Mapped[str] = mapped_column(String, nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
@@ -143,14 +240,18 @@ class Event(Base, BaseMixin):
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     venue_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("venues.id", ondelete="SET NULL"), nullable=True
+        Integer, ForeignKey("venues.id", ondelete="SET NULL"), nullable=True,
     )
 
     #
-    creator: Mapped["User"] = relationship("User", back_populates="events_created")
-    venue: Mapped["Venue"] = relationship("Venue", back_populates="events")
+    creator: Mapped["User"] = relationship(
+        "User", back_populates="events_created")
+    venue: Mapped["Venue"] = relationship(
+        "Venue", back_populates="events", foreign_keys=[venue_id])
     tickets: Mapped[List["Ticket"]] = relationship(
-        "Ticket", back_populates="event", cascade="all, delete-orphan"
+        "Ticket",
+        back_populates="event",
+        cascade="all, delete-orphan"
     )
     reviews: Mapped[List["Review"]] = relationship(
         "Review", back_populates="event", cascade="all, delete-orphan"
@@ -158,6 +259,71 @@ class Event(Base, BaseMixin):
     payments: Mapped[List["Payment"]] = relationship(
         "Payment", back_populates="event", cascade="all, delete-orphan"
     )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    __table_args__ = (
+
+        ExcludeConstraint(
+            ("venue_id", "="),
+            ("time_range", "&&"),
+            name="no_overlapping_active_events_per_venue",
+            using="gist",
+            where=text("is_active = TRUE"),
+        ),
+
+        # End time must be after start
+        CheckConstraint(
+            "end_time > start_time",
+            name="check_end_after_start",
+        ),
+
+        # Unique title per venue
+        UniqueConstraint(
+            "title",
+            "venue_id",
+            name="unique_event_title_per_venue",
+        ),
+    )
+
+
+class EventTicketType(Base):
+    __tablename__ = "event_ticket_types"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    event_id: Mapped[int] = mapped_column(
+        ForeignKey("events.id", ondelete="CASCADE")
+    )
+
+    ticket_type: Mapped[TicketType] = mapped_column(
+        Enum(TicketType, native_enum=False)
+    )
+
+    price: Mapped[float] = mapped_column(Float)
+    total_price: Mapped[float] = mapped_column(Float, default=0.0)
+
+    total_price_sold: Mapped[float] = mapped_column(Float, default=0.0)
+    
+
+    total_quantity: Mapped[int] = mapped_column(Integer)
+    total_sold_quantity: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=True)
+    total_reserved_quantity: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=True
+    )
+    
+
+    tickets: Mapped[List["Ticket"]] = relationship(
+        "Ticket", back_populates="ticket_type")
+    event: Mapped["Event"] = relationship(
+        "Event", back_populates="ticket_types")
+
+    @property
+    def available_quantity(self):
+        return self.total_quantity - self.total_sold_quantity
+
+    @property
+    def check_price_balance(self):
+        return self.total_price - self.total_price_sold
 
 
 class Ticket(Base):
@@ -171,23 +337,57 @@ class Ticket(Base):
     event_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("events.id", ondelete="CASCADE")
     )
-    type: Mapped[TicketType] = mapped_column(
-        Enum(TicketType, native_enum=False), default=TicketType.regular
+
+    status: Mapped[TicketStatus] = mapped_column(
+        Enum(TicketStatus, native_enum=False), default=TicketStatus.PENDING
     )
-    status: Mapped[str] = mapped_column(String, default="reserved")
-    price_paid: Mapped[float] = mapped_column(Float, default=0.0)
-    qr_code: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    price_paid: Mapped[float] = mapped_column(Float, default=0.0, nullable=True)
+    ticket_type_id: Mapped[int] = mapped_column(
+        ForeignKey("event_ticket_types.id")
+    )
+    total_ticket_quantity:Mapped[int]= mapped_column(Integer, nullable=True, index=True)
+    ticket_number: Mapped[str] = mapped_column(
+        String(50),
+        unique=True,
+        index=True,
+        nullable=True
+    )
+    payment_id: Mapped[int] = mapped_column(
+        ForeignKey("payments.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True
+    )
+
+    barcode: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    pdf_status: Mapped[PDFStatus] = mapped_column(
+        Enum(PDFStatus, native_enum=False),
+        nullable=False,
+        index=True,
+        default=PDFStatus.PENDING,
+    )
+
+    ticket_pass_url: Mapped[Optional[str]
+                            ] = mapped_column(String, nullable=True)
+    ticket_pass_public_id: Mapped[Optional[str]
+                                  ] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    ticket_type: Mapped["EventTicketType"] = relationship(
+        "EventTicketType", back_populates="tickets", cascade="all, delete"
     )
 
     event: Mapped["Event"] = relationship("Event", back_populates="tickets")
     user: Mapped["User"] = relationship("User", back_populates="tickets")
     payment: Mapped["Payment"] = relationship(
-        "Payment", back_populates="ticket", uselist=False
+        "Payment", back_populates="tickets", uselist=False
     )
-    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    checked_in_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    checked_in_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+    
 
     def as_dict(self):
         return {
@@ -195,71 +395,80 @@ class Ticket(Base):
             "user_name": f"{self.user.first_name} {self.user.last_name}" if self.user else None,
             "user_email": self.user.email if self.user else None,
             "event_name": self.event.title if self.event else None,
-            "type": self.type.value,
+            "type": self.ticket_types.type.value if self.ticket_types else None,
+            "unit_price": self.ticket_types.price if self.ticket_types else None,
+            "total_price": self.price_paid,
             "status": self.status,
             "price_paid": self.price_paid,
             "venue_name": self.event.venue.name
             if self.event and self.event.venue
             else None,
-            "quantity": self.quantity,
+            "quantity": self.total_ticket_quantity,
         }
 
 
 class Payment(Base, BaseMixin):
     __tablename__ = "payments"
-    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    ticket_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("tickets.id", ondelete="CASCADE")
-    )
+
     event_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("events.id", ondelete="CASCADE")
+        ForeignKey("events.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
+
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE")
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+
+    total_amount: Mapped[float] = mapped_column(Float, nullable=True)
+    ticket_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+
     status: Mapped[PaymentStatus] = mapped_column(
-        Enum(PaymentStatus, native_enum=False), default=PaymentStatus.pending
+        Enum(PaymentStatus, native_enum=False),
+        default=PaymentStatus.PENDING,
+        index=True
     )
-    ticket_quantity: Mapped[int] = mapped_column(Integer, default=1)
-    payment_method: Mapped[str] = mapped_column(String, default="card")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    reference: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    ticket: Mapped["Ticket"] = relationship("Ticket", back_populates="payment")
+
+    payment_method: Mapped[PaymentMethod] = mapped_column(
+        Enum(PaymentMethod, native_enum=False),
+        nullable=False,
+        default=PaymentMethod.NONE_YET
+    )
+    
+
+    reference: Mapped[str] = mapped_column(
+        String(120),
+        unique=True,
+        index=True,
+        nullable=False
+    )
+
+    transaction_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now()
+    )
+
+    # 🔥 Relationships
     user: Mapped["User"] = relationship("User", back_populates="payments")
     event: Mapped["Event"] = relationship("Event", back_populates="payments")
 
-    def as_dict(self, include_ids: bool = False):
-        event = self.event or (self.ticket.event if self.ticket else None)
-        name = f"{self.user.first_name} {self.user.last_name}" if self.user else None
-        data = {
-            "id": self.id,
-            "user_name": name,
-            "status": self.status.value if self.status else None,
-            "ticket_quantity": self.ticket_quantity,
-            "event_name": event.title if event else None,
-            "event_creator": f"{event.creator.first_name} {event.creator.last_name}" if event and event.creator else None,
-            "venue": event.venue.name if event and event.venue else None,  # rename key
-            "amount": self.amount,
-            "payment_method": self.payment_method,
-            "created_at": self.created_at.isoformat()
-            if include_ids
-            else self.created_at.isoformat(),
-            "reference": self.reference,
-        }
+    tickets: Mapped[List["Ticket"]] = relationship(
+        "Ticket",
+        back_populates="payment",
+        cascade="all"
+    )
 
-        if include_ids:
-            data.update(
-                {
-                    "ticket_id": self.ticket.id if self.ticket else None,
-                    "event_id": event.id if event else None,
-                }
-            )
-
-        return data
-
+    items: Mapped[List["PaymentItem"]] = relationship(
+        "PaymentItem",
+        back_populates="payment",
+        cascade="all, delete-orphan"
+    )
 
 class Review(Base):
     __tablename__ = "reviews"
@@ -274,7 +483,8 @@ class Review(Base):
     )
     rating: Mapped[int] = mapped_column(Integer, nullable=False)
     comment: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
@@ -294,3 +504,29 @@ class Review(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+class PaymentItem(Base):
+    __tablename__ = "payment_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    payment_id: Mapped[int] = mapped_column(
+        ForeignKey("payments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    ticket_type_id: Mapped[int] = mapped_column(
+        ForeignKey("event_ticket_types.id"),
+        nullable=False
+    )
+
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    unit_price: Mapped[float] = mapped_column(Float, nullable=False)
+
+    total_price: Mapped[float] = mapped_column(Float, nullable=False)
+
+    payment: Mapped["Payment"] = relationship("Payment", back_populates="items")
+    ticket_type: Mapped["EventTicketType"] = relationship("EventTicketType")

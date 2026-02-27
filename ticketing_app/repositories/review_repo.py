@@ -43,8 +43,7 @@ class ReviewRepo:
         result = await self.db.execute(stmt)
 
         return [review.as_dict(user, event) for review, event, user in result.all()]
-    async def get_event_by_id(self, event_id: int):
-        return await self.db.get(Event, event_id)
+  
     async def get_user_review_for_event(self, user_id: int, event_id: int):
         return (
             await self.db.execute(

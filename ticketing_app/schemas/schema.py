@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal, Optional
 
 import phonenumbers
-from models.enums import Role
+from models.enums import Role, PaymentMethod, TicketType
 from models.models import Event
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
@@ -24,22 +24,27 @@ class UserCreate(UserBase):
     phone_number: str
 
     @field_validator("phone_number")
+    @classmethod
     def validate_phone(cls, value: str):
         try:
             parsed = phonenumbers.parse(value, None)
             if not phonenumbers.is_valid_number(parsed):
-                raise ValueError("Invalid phone number. Use full international format.")
+                raise ValueError(
+                    "Invalid phone number. Use full international format.")
             return phonenumbers.format_number(
                 parsed, phonenumbers.PhoneNumberFormat.E164
             )
         except Exception:
-            raise ValueError("Invalid phone number format. Use e.g. +2348012345678")
+            raise ValueError(
+                "Invalid phone number format. Use e.g. +2348012345678")
 
     @field_validator("first_name", "last_name", mode="before")
+    @classmethod
     def capitalize_names(cls, value: str):
         return value.strip().title()
 
     @field_validator("password")
+    @classmethod
     def validate_password(cls, v: str):
         errors = []
         if len(v) < 7:
@@ -81,6 +86,7 @@ class ResetPasswordSchema(BaseModel):
     new_password: str
 
     @model_validator(mode="before")
+    @classmethod
     def validate_token_or_otp(cls, values):
         token = values.get("token")
         otp = values.get("otp")
@@ -116,7 +122,18 @@ class EventCreate(BaseModel):
         return self
 
 
+class EventBaseOut(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    start_time: datetime
+    end_time: datetime
+    venue_id: Optional[int]
+    created_by: Optional[int]
+
+
 class EventOut(BaseModel):
+    """Output schema for Event data."""
     id: int
     title: str
     description: Optional[str]
@@ -224,7 +241,7 @@ class PaymentRefund(BaseModel):
 class PaymentInit(BaseModel):
     ticket_id: int
 
-    method: Literal["paystack", "flutterwave"]
+    method: PaymentMethod
 
 
 class PaymentVerifyOut(BaseModel):
@@ -262,11 +279,65 @@ class ReviewOut(BaseModel):
         form_attributes = True
 
 
+class StateBaseSchema(BaseModel):
+    name: str
+    model_config = {"from_attributes": True}
+
+
+class StateSchema(StateBaseSchema):
+    id: int
+    location: Optional[dict] = None
+    venues: list["VenueOut"] = Field(default_factory=list)
+    model_config = {"from_attributes": True}
+
+
 class VenueCreate(BaseModel):
     name: str
     address: str
     capacity: int
+    state_id:int
+    
     # location: Optional[str] = None
+
+    @field_validator("name",  "address", mode="before")
+    @classmethod
+    def capitalize_names(cls, value: str):
+        return value.strip().title()
+
+    @field_validator("capacity", mode="before")
+    @classmethod
+    def validate_capacity(cls, v: int):
+        if v <= 500:
+            raise ValueError("Capacity must be greater than 500")
+        if v >= 50_000_00:
+            raise ValueError("Capacity limit exceeded")
+
+        return v
+
+
+class VenueUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    capacity: Optional[int] = None
+    state_id: Optional[int] = None
+
+    @field_validator("name",  "address", mode="before")
+    @classmethod
+    def capitalize_names(cls, value: str):
+        if value is not None:
+         return value.strip().title()
+
+    @field_validator("capacity", mode="before")
+    @classmethod
+    def validate_capacity(cls, v: int):
+        if v is not None:
+            if v <= 500:
+                raise ValueError("Capacity must be greater than 500")
+            if v >= 50_000_00:
+                raise ValueError("Capacity limit exceeded")
+
+        return v
+
 
 
 class VenueOut(BaseModel):
@@ -275,9 +346,9 @@ class VenueOut(BaseModel):
     address: str
     capacity: int
     location: Optional[dict]
-
-    class Config:
-        form_attributes = True
+    location: Optional[dict] = None
+    events: list["EventBaseOut"] = Field(default_factory=list)
+    model_config = {"from_attributes": True}
 
 
 class PaymentOutS(BaseModel):
@@ -304,3 +375,11 @@ class TicketOutS(BaseModel):
 
     class Config:
         form_attributes = True
+
+
+class EventTicketTypeCreate(BaseModel):
+    ticket_type:TicketType
+    total_quantity:int
+    price:float
+
+

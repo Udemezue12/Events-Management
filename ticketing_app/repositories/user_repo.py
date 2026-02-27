@@ -3,7 +3,8 @@ from datetime import datetime
 from models.models import BlacklistedToken, User
 from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
-
+from sqlalchemy.dialects.postgresql import insert
+from typing import Optional
 
 class UserRepo:
     def __init__(self, db):
@@ -19,6 +20,10 @@ class UserRepo:
     async def get_by_lastName(self, last_name: str) -> User | None:
         result = await self.db.execute(select(User).where(User.last_name == last_name))
         return result.scalar_one_or_none()
+    async def get_by_id(self, user_id:int) -> Optional[User ]:
+        result = await self.db.execute(select(User).where(User.id == user_id))
+        return result.scalar_one_or_none()
+    
     
 
     async def get_by_email(self, email: str) -> User | None:
@@ -62,8 +67,13 @@ class UserRepo:
             raise
 
     async def blacklist_token(self, token: str):
-        self.db.add(BlacklistedToken(token=token))
+        stmt = (
+            insert(BlacklistedToken)
+            .values(token=token)
+            .on_conflict_do_nothing(index_elements=["token"])
+        )
         try:
+            await self.db.execute(stmt)
             await self.db.commit()
         except SQLAlchemyError:
             await self.db.rollback()

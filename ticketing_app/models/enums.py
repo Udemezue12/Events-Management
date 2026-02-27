@@ -1,24 +1,43 @@
 import enum
 
 
-class Role(enum.Enum):
-    admin = "admin"
-    organizer = "organizer"
-    attendee = "attendee"
+class Role(str,enum.Enum):
+    ADMIN = "ADMIN"
+    ORGANIZER = "ORGANIZER"
+    ATTENDEE = "ATTENDEE"
 
-class TicketType(enum.Enum):
-    regular = "regular"
-    vip = "vip"
-    early_bird = "early_bird"
+class TicketType(str,enum.Enum):
+    REGULAR = "REGULAR"
+    VIP = "VIP"
+    EARLY_BIRD = "EARLY_BIRD"
 
-class EventStatus(enum.Enum):
-    upcoming = "upcoming"
-    ongoing = "ongoing"
-    completed = "completed"
-    cancelled = "cancelled"
+class TicketStatus(str,enum.Enum):
+    PENDING = "PENDING"
+    RESERVED="RESERVED"
+    SOLD = "SOLD"
+    CANCELLED = "CANCELLED"
+    REFUNDED="REFUNDED"
+    CHECKED_IN="CHECKED_IN"
 
-class PaymentStatus(enum.Enum):
-    pending = "pending"
-    completed = "completed"
-    failed = "failed"
-    refunded = "refunded"
+class EventStatus(str,enum.Enum):
+    UPCOMING = "UPCOMING"
+    ONGOING = "ONGOING"
+    COMPLETED = "COMPLETED"
+    CANCELED = "CANCELED"
+class PDFStatus(str, enum.Enum):
+    PENDING="PENDING"
+    READY="READY"
+    GENERATING="GENERATING"
+    FAILED = "FAILED"
+class PaymentStatus(str,enum.Enum):
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    REFUNDED="REFUNDED"
+    REFUND_PROCESSING = "REFUND_PROCESSING"
+    VERIFICATION_PENDING="VERIFICATION_PENDING"
+class PaymentMethod(str, enum.Enum):
+    NONE_YET="NONE_YET"
+    PAYSTACK = "PAYSTACK"
+    FLUTTERWAVE="FLUTTERWAVE"
+    MONNIFY = "MONNIFY"

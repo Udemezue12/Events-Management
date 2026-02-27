@@ -5,16 +5,15 @@ from typing import ClassVar, List
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
+from .url_parser import parser
+
 load_dotenv()
 
 
 class Settings(BaseSettings):
-    FLUTTERWAVE_BASE_URL: str = "https://api.flutterwave.com/v3"
-    PAYSTACK_BASE_URL: str = "https://api.paystack.co"
-    REDIRECT_URL: str | None = os.getenv("REDIRECT_URL")
-    DATABASE_URL: str | None = os.getenv("DATABASE_URL")
-    RENDER_DATABASE_URL: str | None = os.getenv("RENDER_DATABASE_URL")
-    PROJECT_NAME: str = "EVENTS MANAGEMENT AND BOOKING SYSTEM"
+    PROJECT_NAME: str = "AUTOPOPULATE API"
+    ASYNC_DATABASE_URL: str | None = os.getenv("ASYNC_DATABASE_URL", "").strip() or None
+    SYNC_DATABASE_URL: str | None = os.getenv("SYNC_DATABASE_URL", "").strip() or None
     RATE_LIMIT_REDIS_URL: str = (
         f"redis://{os.getenv('RATE_LIMIT_REDIS_USERNAME')}:{os.getenv('RATE_LIMIT_REDIS_PASSWORD')}"
         f"@{os.getenv('RATE_LIMIT_REDIS_HOST')}:{os.getenv('RATE_LIMIT_REDIS_PORT')}/0"
@@ -30,18 +29,20 @@ class Settings(BaseSettings):
     REDIS_URL: str = os.getenv(
         "REDIS_URL", "rediss://:123456789@gusc1-related-narwhal-32244.upstash.io:6379"
     )
-    GEOAPIFY_API_KEY: str | None = os.getenv("GEOAPIFY_API_KEY")
     GOOGLE_CLIENT_ID: str | None = os.getenv("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET: str | None = os.getenv("GOOGLE_CLIENT_SECRET")
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/google/callback"
     RATE_LIMIT: str = "20/minute"
     UPSTASH_REDIS_TOKEN: str | None = os.getenv("UPSTASH_REDIS_REST_TOKEN")
-    UPSTASH_REDIS_URL: str | None = os.getenv("UPSTASH_REDIS_REST_URL")
+    UPSTASH_REDIS_REST_URL: str | None = os.getenv("UPSTASH_REDIS_REST_URL ")
     EMAIL_USER: str | None = os.getenv("EMAIL_USER")
     EMAIL_PASSWORD: str | None = os.getenv("EMAIL_PASSWORD")
     EMAIL_SERVER: str | None = os.getenv("EMAIL_SERVER")
     EMAIL_PORT: int = 587
     EMAIL_USE_TLS: bool = True
+    CLOUDINARY_CLOUD_NAME: str | None = os.getenv("CLOUDINARY_CLOUD_NAME")
+    CLOUDINARY_API_KEY: str | None = os.getenv("CLOUDINARY_API_KEY")
+    CLOUDINARY_SECRET_KEY: str | None = os.getenv("CLOUDINARY_SECRET_KEY")
     RESET_SECRET_KEY: str | None = os.getenv("RESET_SECRET_KEY")
     VERIFY_EMAIL_SECRET_KEY: str | None = os.getenv("VERIFY_EMAIL_SECRET_KEY")
     RESET_PASSWORD_SALT: str = "password-reset-salt"
@@ -76,24 +77,25 @@ class Settings(BaseSettings):
     CRITICAL_SERVICE_RAW: str = os.getenv("CRITICAL_SERVICE_URLS", "")
     RESEND_API_KEY: str | None = os.getenv("RESEND_API_KEY")
     RESEND_SENDER: str = "onboarding@resend.dev"
-    FLUTTERWAVE_SECRET_KEY: str | None = os.getenv("FLUTTERWAVE_SECRET_KEY")
+    ALLOWED_HOSTS_RAW: str = os.getenv("ALLOWED_HOSTS", "")
     PAYSTACK_SECRET_KEY: str | None = os.getenv("PAYSTACK_SECRET_KEY")
+    FLUTTERWAVE_SECRET_KEY: str | None = os.getenv("FLUTTERWAVE_SECRET_KEY")
+
+    @property
+    def ALLOWED_HOSTS(self) -> List[str]:
+        return parser.parse_url_list(self.ALLOWED_HOSTS_RAW, "ALLOWED_HOSTS")
 
     @property
     def CRITICAL_SERVICE_URLS(self) -> List[str]:
-        urls = [
-            url.strip() for url in self.CRITICAL_SERVICE_RAW.split(",") if url.strip()
-        ]
-        valid_urls = [
-            u for u in urls if u.startswith("http://") or u.startswith("https://")
-        ]
-        if not valid_urls:
-            print("WARNING: No valid URLs found in CRITICAL_SERVICE_URLS.")
-        return valid_urls
+        return parser.parse_url_list(
+            self.CRITICAL_SERVICE_RAW,
+            "CRITICAL_SERVICE_URLS",
+        )
 
     class Config:
         env_file = ".env"
         extra = "ignore"
+        case_sensitive = False
 
 
 settings = Settings()

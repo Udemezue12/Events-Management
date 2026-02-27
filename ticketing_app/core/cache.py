@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import logging
 import urllib.parse
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class Cache:
     def __init__(self):
-        self.redis_url = settings.UPSTASH_REDIS_URL.rstrip("/")
+        self.redis_url = settings.UPSTASH_REDIS_REST_URL.rstrip("/")
         self.redis_token = settings.UPSTASH_REDIS_TOKEN
 
         if not self.redis_url or not self.redis_token:
@@ -26,10 +27,14 @@ class Cache:
             "Content-Type": "application/json",
         }
 
+    def _request(self, method: str, url: str, **kwargs):
+        with httpx.Client(timeout=10) as client:
+            return client.request(method, url, headers=self.headers, **kwargs)
+
     @retry(
         stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=10)
     )
-    async def connect(self):
+    async def async_connect(self):
         async def handler():
             async with httpx.AsyncClient() as client:
                 try:
@@ -47,7 +52,30 @@ class Cache:
 
         await breaker.call(handler)
 
-    async def get(self, key: str) -> Optional[str]:
+    @retry(
+        stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=5)
+    )
+    def sync_get(self, key: str) -> Optional[str]:
+        try:
+            encoded_key = urllib.parse.quote(str(key))
+            res = self._request("GET", f"{self.redis_url}/get/{encoded_key}")
+
+            if res.status_code == 200:
+                return res.json().get("result")
+
+            if res.status_code == 404:
+                return None
+
+            raise ConnectionError(f"Redis GET failed ({res.status_code})")
+
+        except Exception as e:
+            logger.error("Sync Redis GET error", exc_info=e)
+            return None
+
+    @retry(
+        stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=5)
+    )
+    async def async_get(self, key: str) -> Optional[str]:
         async def handler():
             try:
                 encoded_key = urllib.parse.quote(str(key))
@@ -70,7 +98,31 @@ class Cache:
 
         return await breaker.call(handler)
 
-    async def set(self, key: str, value: str, ttl: int = 3600) -> None:
+    @retry(
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+    )
+    def sync_set(self, key: str, value: str, ttl: int = 3600) -> None:
+        if key is None or value is None:
+            raise ValueError("Cache key and value cannot be None")
+
+        try:
+            encoded_key = urllib.parse.quote(str(key))
+            url = f"{self.redis_url}/set/{encoded_key}?ex={ttl}"
+
+            res = self._request("POST", url, content=value)
+
+            if res.status_code != 200:
+                raise ConnectionError(f"Redis SET failed ({res.status_code})")
+
+        except Exception as e:
+            logger.error("Sync Redis SET error", exc_info=e)
+
+    @retry(
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+    )
+    async def async_set(self, key: str, value: str, ttl: int = 3600) -> None:
         if key is None or value is None:
             raise ValueError("Cache key and value cannot be None")
 
@@ -94,12 +146,23 @@ class Cache:
 
         return await breaker.call(handler)
 
-    async def delete(self, key: str) -> bool:
+    def sync_delete(self, key: str) -> bool:
+        try:
+            encoded_key = urllib.parse.quote(str(key))
+            res = self._request("POST", f"{self.redis_url}/del/{encoded_key}")
+
+            return res.status_code == 200
+
+        except Exception as e:
+            logger.error("Sync Redis DELETE error", exc_info=e)
+            return False
+
+    async def async_delete(self, key: str) -> bool:
         async def handler():
             try:
                 encoded_key = urllib.parse.quote(str(key))
                 async with httpx.AsyncClient() as client:
-                    res = await client.delete(
+                    res = await client.post(
                         f"{self.redis_url}/del/{encoded_key}", headers=self.headers
                     )
                     if res.status_code == 200:
@@ -111,8 +174,19 @@ class Cache:
 
         return await breaker.call(handler)
 
-    async def get_json(self, key: str) -> Optional[Any]:
-        data = await self.get(key)
+    def sync_get_json(self, key: str) -> Optional[Any]:
+        data = self.sync_get(key)
+        if not data:
+            return None
+
+        try:
+            return json.loads(data)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON format in key: %s", key)
+            return None
+
+    async def async_get_json(self, key: str) -> Optional[Any]:
+        data = await self.async_get(key)
         if not data:
             return None
         try:
@@ -121,17 +195,74 @@ class Cache:
             logger.error("Invalid JSON format in key: %s", key)
             return None
 
-    async def set_json(self, key: str, value: Any, ttl: int = 3600) -> None:
+    def sync_set_json(self, key: str, value: Any, ttl: int = 3600) -> None:
+        data = json.dumps(value)
+        self.sync_set(key, data, ttl)
+
+    async def async_set_json(self, key: str, value: Any, ttl: int = 3600) -> None:
         logger.debug("Setting JSON cache for key: %s", key)
         data = json.dumps(value)
-        await self.set(key, data, ttl)
+        await self.async_set(key, data, ttl)
 
-    def set_json_sync(self, key: str, value: Any):
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.create_task(self.set_json(key, value))
-        else:
-            loop.run_until_complete(self.set_json(key, value))
+    # def set_json_sync(self, key: str, value: Any):
+    #     loop = asyncio.get_event_loop()
+    #     if loop.is_running():
+    #         asyncio.create_task(self.set_json(key, value))
+    #     else:
+    #         loop.run_until_complete(self.set_json(key, value))
+
+    async def delete_cache_keys_async(self, *keys: str):
+        if not keys:
+            return
+        unique_keys = set(keys)
+        await asyncio.gather(*(self.async_delete(key) for key in unique_keys))
+
+    
+
+    def sync_set_raw(self, key: str, value: bytes, ttl: int = 3600):
+        if not isinstance(value, (bytes, bytearray)):
+            raise TypeError("set_raw expects bytes")
+
+        encoded = base64.urlsafe_b64encode(value).decode("ascii")
+        self.sync_set(key, encoded, ttl)
+
+    def sync_get_raw(self, key: str) -> Optional[bytes]:
+        data = self.sync_get(key)
+        if not data:
+            return None
+
+        try:
+            return base64.urlsafe_b64decode(data)
+        except Exception as e:
+            logger.error("Failed to decode raw cache value", exc_info=e)
+            return None
+
+    async def get_raw(self, key: str) -> Optional[bytes]:
+        data = await self.async_get(key)
+        if not data:
+            return None
+
+        try:
+            return base64.urlsafe_b64decode(data)
+        except Exception as e:
+            logger.error("Failed to decode raw cache value for key %s", key, exc_info=e)
+            return None
+
+    async def set_raw(self, key: str, value: bytes, ttl: int = 3600):
+        if not isinstance(value, (bytes, bytearray)):
+            raise TypeError("set_raw expects bytes")
+
+        encoded = base64.urlsafe_b64encode(value).decode("ascii")
+        await self.async_set(key, encoded, ttl)
+        return {
+            "key": key,
+            "ttl": ttl,
+            "size": len(encoded),
+            "type": type(value).__name__,
+        }
+
+    async def delete_raw(self, key: str) -> bool:
+        return await self.async_delete(key)
 
     async def ping(self) -> bool:
         try:

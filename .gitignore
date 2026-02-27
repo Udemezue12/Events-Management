@@ -1,4 +1,5 @@
 /ticket-env/
+/event-env/
 /ticketing_app/__pycache__/
 /ticketing_app/.env
 /ticketing_app/alembic.inissss
@@ -16,6 +17,7 @@
 /ticketing_app/tests/__pycache__
 /ticketing_app/utils/__pycache__
 /ticketing_app/worker/__pycache__
+/ticketing_app/tasks/__pycache__
 /ticketing_app/routes/__pycache__
 /ticketing_app/fintechs/__pycache__
 /ticketing_app/astro.db
